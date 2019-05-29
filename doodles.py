@@ -8,52 +8,13 @@ import dataloader
 import sys
 import math
 import pickle
+from network import ConvNet
 
 print("\n\nDoodle CNN")
 print("Programmed for pytorch v1.0.0")
+torch.cuda.empty_cache()
 
 # Image.fromarray(imData * 255).resize((1000, 1000)).show()
-
-### https://adventuresinmachinelearning.com/convolutional-neural-networks-tutorial-in-pytorch/
-class ConvNet(nn.Module):
-	def __init__(self, nClasses, imageSize):
-		super(ConvNet, self).__init__()
-		# 1 128x128 image goes in, 32 64x64 images come out
-		self.layer1 = nn.Sequential(
-			nn.Conv2d(in_channels=1, out_channels=32, kernel_size=5, stride=1, padding=2),
-			nn.ReLU(),
-			nn.MaxPool2d(kernel_size=2, stride=2))
-		imageSize = imageSize // 2
-
-		# 32 64x64 images go in, 64 32x32 image comes out
-		self.layer2 = nn.Sequential(
-			nn.Conv2d(in_channels=32, out_channels=32, kernel_size=5, stride=1, padding=2),
-			nn.ReLU(),
-			nn.MaxPool2d(kernel_size=2, stride=2))
-		imageSize = imageSize // 2
-
-		# 32 64x64 images go in, 64 32x32 image comes out
-		self.layer3 = nn.Sequential(
-			nn.Conv2d(in_channels=32, out_channels=32, kernel_size=5, stride=1, padding=2),
-			nn.ReLU(),
-			nn.MaxPool2d(kernel_size=2, stride=2))
-		imageSize = imageSize // 2
-
-		self.drop_out = nn.Dropout()
-		self.fc1 = nn.Linear(in_features=imageSize * imageSize * 32, out_features=(imageSize//4) * (imageSize//4) * 64)
-		self.fc2 = nn.Linear(in_features=(imageSize//4) * (imageSize//4) * 64, out_features=nClasses)
-
-	def forward(self, x):
-		out = self.layer1(x)
-		out = self.layer2(out)
-		out = self.drop_out(out)
-		out = self.layer3(out)
-		out = out.reshape(out.size(0), -1)
-		
-		out = self.drop_out(out)
-		out = self.fc1(out)
-		out = self.fc2(out)
-		return out
 
 #####################################################################################
 #####################################################################################
@@ -62,25 +23,24 @@ class ConvNet(nn.Module):
 NCLASSES = 250
 NFILES = 80
 IMAGE_SIZE = 128
-EPOCHS = 20
+EPOCHS = 50
 NBATCHES = NCLASSES * NFILES * 0.01
 
 # Select device
 device = torch.device("cuda:0" if torch.cuda.is_available() else "cpu")
 ### Load data ###
-data = None
-iClasses = None
-classToLabel = None
+data, iClasses, classToLabel = None, None, None
 if False:
 	print("Loading and preprocessing images..")
-	data, iClasses, classToLabel = dataloader.loadAndPrepAllImages(NCLASSES, NFILES, IMAGE_SIZE, rootfolder="/home/emiel/sketches_png")
-	print("Storing files as pickles..")
-	with open("data.pickle", 'wb') as pickle_file:
-		pickle.dump(data, pickle_file, pickle.HIGHEST_PROTOCOL)
-	with open("iClasses.pickle", 'wb') as pickle_file:
-		pickle.dump(iClasses, pickle_file, pickle.HIGHEST_PROTOCOL)
-	with open("classToLabel.pickle", 'wb') as pickle_file:
-		pickle.dump(classToLabel, pickle_file, pickle.HIGHEST_PROTOCOL)
+	data, iClasses, classToLabel = dataloader.loadAndPrepAllImages(NCLASSES, NFILES, IMAGE_SIZE)
+	if False:
+		print("Storing files as pickles..")
+		with open("data.pickle", 'wb') as pickle_file:
+			pickle.dump(data, pickle_file, pickle.HIGHEST_PROTOCOL)
+		with open("iClasses.pickle", 'wb') as pickle_file:
+			pickle.dump(iClasses, pickle_file, pickle.HIGHEST_PROTOCOL)
+		with open("classToLabel.pickle", 'wb') as pickle_file:
+			pickle.dump(classToLabel, pickle_file, pickle.HIGHEST_PROTOCOL)
 else:
 	print("Loading pickles..")
 	with open("data.pickle", "rb") as pickle_file:
@@ -114,7 +74,7 @@ batchSize = math.ceil(NTRAIN / NBATCHES)
 
 ### Create directory to store model weights ###
 nowStr = datetime.now().strftime("%y%m%d-%H%M%S")
-modelDir = "./model_%s_%dx%d_%d_%d" % (nowStr, IMAGE_SIZE, IMAGE_SIZE, NCLASSES, NFILES)
+modelDir = "./model_%s_%d_%d_%d" % (nowStr, IMAGE_SIZE, NCLASSES, NFILES)
 os.mkdir(modelDir)
 
 ### Profile storage ###
@@ -128,6 +88,9 @@ print("   Memory : data=%0.2fGB train=%0.2fGB test=%0.2fGB" % (dataInGb, trainIn
 print(" Training : NTRAIN=%d NTEST=%d EPOCHS=%d NBATCHES=%d batchSize=%d" % (NTRAIN, NTEST, EPOCHS, NBATCHES, batchSize))
 print("")
 
+################
+### Training ###
+################
 for i in range(0, EPOCHS):
 	
 	### Train batch
@@ -147,7 +110,6 @@ for i in range(0, EPOCHS):
 	acc = 0.0
 	for nB in range(0, NTRAIN, batchSize):
 		print("\r  Accuracy %d/%d" % (nB+batchSize, NTRAIN), end=" "*20, flush=True)
-
 		# Forward pass
 		y = model(dataTrain[nB:nB+batchSize])
 		_, predicted = torch.max(y.data, 1)
@@ -164,13 +126,34 @@ for i in range(0, EPOCHS):
 ### Calculate accuracy
 print("\nTesting CNN on cpu..")
 model = model.to("cpu")
-acc = 0.0
+correct = 0
 for nB in range(0, NTEST, batchSize):
-	print("\r  Accuracy %d/%d" % (nB+batchSize, NTRAIN), end=" "*20, flush=True)
-	# Forward pass
 	y = model(dataTest[nB:nB+batchSize])
 	_, predicted = torch.max(y.data, 1)
-	correct = (predicted == labelsTest[nB:nB+batchSize]).sum().item()
-	acc += correct / batchSize
-acc = acc / NBATCHES
+	correct += (predicted == labelsTest[nB:nB+batchSize]).sum().item()
 print("Accuracy : %0.2f" % (correct / NTEST))
+
+
+
+
+
+
+correct = [0] * NCLASSES
+data = torch.FloatTensor(data)
+for i in range(0, NCLASSES * NFILES):
+	d = data[i]
+	c = iClasses[i]
+	l = classToLabel[c]
+
+	output = model(data[i:i+1])
+	_, predicted = torch.max(output.data, 1)
+	p = predicted.item()
+	if c == p:
+		correct[c] += 1
+	print("\r  %s - %d" % (l, correct[c]), " "*20, end="", flush=True)
+print("\r", " "*40)
+
+performance = list(zip(correct, classToLabel))
+performance.sort(reverse=True)
+for i, c in performance:
+	print(c.rjust(20), "%0.2f" % (i/NFILES))
