@@ -5,13 +5,23 @@ from PIL import Image, ImageOps
 
 def prepImage(im, imsize=64):
 	im = ImageOps.invert(im) # Invert the image. Background becomes black, drawing becomes white
+	
 	im = im.resize((imsize, imsize), Image.LANCZOS) # Resize from (1111, 1111) to (64, 64); 
 	imData = np.array(im) / 255 # Convert image to Numpy array and normalize pixel values to [0, 1]
+	
+	# Image.fromarray(imData * 255).resize((1000, 1000)).show()
+	
+	imData -= np.min(imData)
+	imData /= np.max(imData)
+
+	# Image.fromarray(imData * 255).resize((1000, 1000)).show()
+	
 	imData = imData.reshape(1, imsize, imsize)
 	return imData
 
 def loadAndPrepImage(imPath, imsize=64):
-	im = Image.open(imPath) # Load image
+	im = Image.open(imPath).convert('L') # Load image
+
 	return prepImage(im, imsize)	
 
 def loadAndPrepAllImages(nClasses = 250, nFiles = 80, imsize=64, rootfolder="./sketches_png"):
@@ -33,7 +43,7 @@ def loadAndPrepAllImages(nClasses = 250, nFiles = 80, imsize=64, rootfolder="./s
 	# Load all files for all classes
 	for iC, c in enumerate(classes):
 		print("%s(%d)" % (c, iC), end=", ", flush=True)
-		
+
 
 		classToLabel[iC] = c # Store int => class
 		classDir = rootfolder + "/" + c
