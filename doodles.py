@@ -76,7 +76,7 @@ batchSize = math.ceil(NTRAIN / NBATCHES)
 
 ### Create directory to store model weights ###
 nowStr = datetime.now().strftime("%y%m%d-%H%M%S")
-modelDir = "./model_%s_%d_%d_%d" % (nowStr, IMAGE_SIZE, NCLASSES, NFILES)
+modelDir = "model_%s_%d_%d_%d" % (nowStr, IMAGE_SIZE, NCLASSES, NFILES)
 os.mkdir(modelDir)
 copyfile("./network.py", modelDir + "/network.py")
 
@@ -99,19 +99,13 @@ for i in range(0, EPOCHS):
 	### Train batch
 	for nB in range(0, NTRAIN, batchSize):
 		print("\r  Batching %d/%d" % (nB+batchSize, NTRAIN), end=" "*20, flush=True)
-		
 		# Run the forward pass
 		y = model(dataTrain[nB:nB+batchSize])
 		loss = criterion(y, labelsTrain[nB:nB+batchSize])
-		
 		# Backprop and perform Adam optimisation
 		optimizer.zero_grad()
 		loss.backward()
 		optimizer.step()
-
-		# for name, param in model.named_parameters():
-		# 	if param.requires_grad:
-		# 		print(name.rjust(30), param.data.size())
 
 	### Calculate accuracy
 	acc = 0.0
