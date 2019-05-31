@@ -6,36 +6,57 @@ from torch.autograd import Variable
 class ConvNet(nn.Module):
 	def __init__(self, nClasses, imageSize):
 		super(ConvNet, self).__init__()
-		# 1 128x128 image goes in, 32 64x64 images come out
+		print("[Network] ", end="")
+		
 		self.layer1 = nn.Sequential(
-			nn.Conv2d(in_channels=1, out_channels=32, kernel_size=5, stride=1, padding=2),
+			nn.Conv2d(in_channels=1, out_channels=64, kernel_size=5, stride=1, padding=2),
 			nn.ReLU(),
 			nn.MaxPool2d(kernel_size=2, stride=2))
+		print("%dx%dx%d -> " % (self.layer1[0].in_channels, imageSize, imageSize), end="")
 		imageSize = imageSize // 2
-
-		# 32 64x64 images go in, 64 32x32 image comes out
+		
 		self.layer2 = nn.Sequential(
-			nn.Conv2d(in_channels=32, out_channels=32, kernel_size=5, stride=1, padding=2),
+			nn.Conv2d(in_channels=64, out_channels=64, kernel_size=5, stride=1, padding=2),
 			nn.ReLU(),
 			nn.MaxPool2d(kernel_size=2, stride=2))
+		print("%dx%dx%d -> " % (self.layer2[0].in_channels, imageSize, imageSize), end="")
 		imageSize = imageSize // 2
 
-		# 32 64x64 images go in, 64 32x32 image comes out
 		self.layer3 = nn.Sequential(
-			nn.Conv2d(in_channels=32, out_channels=32, kernel_size=5, stride=1, padding=2),
+			nn.Conv2d(in_channels=64, out_channels=64, kernel_size=5, stride=1, padding=2),
+			nn.ReLU())
+		print("%dx%dx%d -> " % (self.layer2[0].in_channels, imageSize, imageSize), end="")
+
+		self.layer4 = nn.Sequential(
+			nn.Conv2d(in_channels=64, out_channels=64, kernel_size=5, stride=1, padding=2),
 			nn.ReLU(),
 			nn.MaxPool2d(kernel_size=2, stride=2))
+		print("%dx%dx%d -> " % (self.layer2[0].in_channels, imageSize, imageSize), end="")
 		imageSize = imageSize // 2
 
+		self.layer5 = nn.Sequential(
+            nn.Conv2d(in_channels=64, out_channels=64, kernel_size=5, stride=1, padding=2),
+			nn.ReLU(),
+			nn.MaxPool2d(kernel_size=2, stride=2))
+		print("%dx%dx%d -> " % (self.layer3[0].in_channels, imageSize, imageSize), end="")
+		imageSize = imageSize // 2
+		print("%dx%dx%d -> " % (self.layer3[0].out_channels, imageSize, imageSize), end="")
+		
 		self.drop_out = nn.Dropout()
-		self.fc1 = nn.Linear(in_features=imageSize * imageSize * 32, out_features=(imageSize//4) * (imageSize//4) * 64)
-		self.fc2 = nn.Linear(in_features=(imageSize//4) * (imageSize//4) * 64, out_features=nClasses)
+		print("dropout -> ", end="")
+
+		self.fc1 = nn.Linear(in_features=imageSize * imageSize * 64, out_features=imageSize * imageSize * 16)
+		print("1x%d -> " % (self.fc1.in_features), end="")
+
+		self.fc2 = nn.Linear(in_features=imageSize * imageSize * 16, out_features=nClasses)
+		print("1x%d -> 1x%d" % (self.fc2.in_features, self.fc2.out_features))
 
 	def forward(self, x):
 		out = self.layer1(x)
 		out = self.layer2(out)
-		out = self.drop_out(out)
 		out = self.layer3(out)
+		out = self.layer4(out)
+		out = self.layer5(out)
 		out = out.reshape(out.size(0), -1)
 		
 		out = self.drop_out(out)
