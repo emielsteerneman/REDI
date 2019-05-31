@@ -2,6 +2,8 @@ import sys
 import os
 import numpy as np
 from PIL import Image, ImageOps
+from network import ConvNet
+import torch
 
 def prepImage(im, imsize=64):
 	im = ImageOps.invert(im) # Invert the image. Background becomes black, drawing becomes white
@@ -14,6 +16,10 @@ def prepImage(im, imsize=64):
 	imData -= np.min(imData)
 	imData /= np.max(imData)
 
+	indices = imData < 0.1
+	imData[indices] = 0
+	imData[~indices]= 1
+
 	# Image.fromarray(imData * 255).resize((1000, 1000)).show()
 	
 	imData = imData.reshape(1, imsize, imsize)
@@ -25,7 +31,7 @@ def loadAndPrepImage(imPath, imsize=64):
 	return prepImage(im, imsize)	
 
 def loadAndPrepAllImages(nClasses = 250, nFiles = 80, imsize=64, rootfolder="./sketches_png"):
-	print("\n[dataloader.py] Loading and preparing %d classes with %d images each :" % (nClasses, nFiles), end=" ", flush=True)
+	print("\n[dataloader] Loading and preparing %d classes with %d images each :" % (nClasses, nFiles), end=" ", flush=True)
 	# Retrieve all classes	
 	classes = []
 	for classDir in os.listdir(rootfolder):
@@ -54,5 +60,21 @@ def loadAndPrepAllImages(nClasses = 250, nFiles = 80, imsize=64, rootfolder="./s
 			data.append(file)
 			iClasses.append(iC)
 
-	print("\n[dataloader.py] Images loaded\n")
+	print("\n[dataloader] Images loaded\n")
 	return data, iClasses, classToLabel
+
+def loadModelFromDir(modelDir):
+	# model_190530-011512_128_250_80
+	[_, date, IMAGE_SIZE, NCLASSES, NFILES] = modelDir.split("_")
+	IMAGE_SIZE, NCLASSES, NFILES = int(IMAGE_SIZE), int(NCLASSES), int(NFILES)
+	### Get latest weights
+	models = os.listdir(modelDir)
+	models = list(filter(lambda x : x.endswith(".model"), models))
+	models.sort(key=lambda x : int(x.split("_")[0]), reverse=True)
+	weightsFile = models[0]
+	print("[dataloader] Loading weights from " + modelDir + "/" + weightsFile)
+	modelWeights = torch.load(modelDir + "/" + weightsFile)
+	### Create model and restore weights
+	model = ConvNet(NCLASSES, IMAGE_SIZE)
+	model.load_state_dict(modelWeights)
+	return model, date, IMAGE_SIZE, NCLASSES, NFILES
