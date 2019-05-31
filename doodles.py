@@ -9,6 +9,7 @@ import sys
 import math
 import pickle
 from network import ConvNet
+from shutil import copyfile
 
 print("\n\nDoodle CNN")
 print("Programmed for pytorch v1.0.0")
@@ -20,17 +21,18 @@ torch.cuda.empty_cache()
 #####################################################################################
 #####################################################################################
 
-NCLASSES = 250
+NCLASSES = 10
 NFILES = 80
 IMAGE_SIZE = 128
-EPOCHS = 50
-NBATCHES = NCLASSES * NFILES * 0.01
+EPOCHS = 20
+NBATCHES = NCLASSES * NFILES * 0.1
 
 # Select device
 device = torch.device("cuda:0" if torch.cuda.is_available() else "cpu")
+
 ### Load data ###
 data, iClasses, classToLabel = None, None, None
-if False:
+if True:
 	print("Loading and preprocessing images..")
 	data, iClasses, classToLabel = dataloader.loadAndPrepAllImages(NCLASSES, NFILES, IMAGE_SIZE)
 	if False:
@@ -76,6 +78,7 @@ batchSize = math.ceil(NTRAIN / NBATCHES)
 nowStr = datetime.now().strftime("%y%m%d-%H%M%S")
 modelDir = "./model_%s_%d_%d_%d" % (nowStr, IMAGE_SIZE, NCLASSES, NFILES)
 os.mkdir(modelDir)
+copyfile("./network.py", modelDir + "/network.py")
 
 ### Profile storage ###
 dataInGb   = sum([d.nbytes for d in data]) / 1e9
@@ -106,6 +109,10 @@ for i in range(0, EPOCHS):
 		loss.backward()
 		optimizer.step()
 
+		# for name, param in model.named_parameters():
+		# 	if param.requires_grad:
+		# 		print(name.rjust(30), param.data.size())
+
 	### Calculate accuracy
 	acc = 0.0
 	for nB in range(0, NTRAIN, batchSize):
@@ -115,7 +122,7 @@ for i in range(0, EPOCHS):
 		_, predicted = torch.max(y.data, 1)
 		correct = (predicted == labelsTrain[nB:nB+batchSize]).sum().item()
 		acc += correct / batchSize
-	acc = acc / NBATCHES	
+	acc = acc / NBATCHES
 
 	print("\r  epoch=%d" % i, "accuracy=%0.2f" % acc)
 	
@@ -134,17 +141,13 @@ for nB in range(0, NTEST, batchSize):
 print("Accuracy : %0.2f" % (correct / NTEST))
 
 
-
-
-
-
 correct = [0] * NCLASSES
 data = torch.FloatTensor(data)
 for i in range(0, NCLASSES * NFILES):
 	d = data[i]
 	c = iClasses[i]
 	l = classToLabel[c]
-
+	
 	output = model(data[i:i+1])
 	_, predicted = torch.max(output.data, 1)
 	p = predicted.item()
