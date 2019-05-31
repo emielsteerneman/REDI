@@ -2,8 +2,8 @@ import sys
 import os
 import numpy as np
 from PIL import Image, ImageOps
-from network import ConvNet
 import torch
+import importlib
 
 def prepImage(im, imsize=64):
 	im = ImageOps.invert(im) # Invert the image. Background becomes black, drawing becomes white
@@ -64,6 +64,8 @@ def loadAndPrepAllImages(nClasses = 250, nFiles = 80, imsize=64, rootfolder="./s
 	return data, iClasses, classToLabel
 
 def loadModelFromDir(modelDir):
+	network = importlib.import_module(".network", package=modelDir)
+
 	# model_190530-011512_128_250_80
 	[_, date, IMAGE_SIZE, NCLASSES, NFILES] = modelDir.split("_")
 	IMAGE_SIZE, NCLASSES, NFILES = int(IMAGE_SIZE), int(NCLASSES), int(NFILES)
@@ -75,6 +77,6 @@ def loadModelFromDir(modelDir):
 	print("[dataloader] Loading weights from " + modelDir + "/" + weightsFile)
 	modelWeights = torch.load(modelDir + "/" + weightsFile)
 	### Create model and restore weights
-	model = ConvNet(NCLASSES, IMAGE_SIZE)
+	model = network.ConvNet(NCLASSES, IMAGE_SIZE)
 	model.load_state_dict(modelWeights)
 	return model, date, IMAGE_SIZE, NCLASSES, NFILES
