@@ -19,7 +19,9 @@ class SaveFeatures():
     def __init__(self, module):
         self.hook = module.register_forward_hook(self.hook_fn)
     def hook_fn(self, module, input, output):
-        self.features = torch.tensor(output,requires_grad=True)
+        print("Activation called!", output.size())
+        self.features = output
+        # self.features = torch.tensor(output,requires_grad=True)
         # self.features = output.clone().detach().requires_grad_(True)
     def close(self):
         self.hook.remove()
@@ -33,12 +35,12 @@ model, date, IMAGE_SIZE, NCLASSES, NFILES = dataloader.loadModelFromDir(modelDir
 model.to(device)
 
 summary(model, (1, 128, 128), 1)
-exit()
+
 for name, param in model.named_parameters():
 	print(name.ljust(20), param.size())
 
 img = dataloader.loadAndPrepImage("sketches_png/radio/13474.png", IMAGE_SIZE)
-imgTensor = torch.FloatTensor(img.reshape(1, 1, IMAGE_SIZE, IMAGE_SIZE))
+imgTensor = torch.FloatTensor(img.reshape(1, 1, IMAGE_SIZE, IMAGE_SIZE)).cuda()
 
 # cv2.imshow("img", img.reshape(IMAGE_SIZE, IMAGE_SIZE)*255)
 # cv2.waitKey(0)
@@ -49,14 +51,14 @@ imgTensor = torch.FloatTensor(img.reshape(1, 1, IMAGE_SIZE, IMAGE_SIZE))
 ##########################################
 # accumulate = np.zeros((280, 1120), dtype=np.uint8)
 # output = model.layer1(imgTensor)
-# images = output.data[0].numpy()
+# images = output.cpu().data[0].numpy()
 # for i, image in enumerate(images):
 # 	dx, dy = i % 16, i // 16
 # 	px, py = dx * 70, dy * 70
 # 	accumulate[py:py+64, px:px+64] = normalize(image)*255
 # cv2.imshow("accumulate", accumulate)
-# cv2.imshow("First", enlarge(normalize(images[0])))
-
+# cv2.waitKey(0)
+# cv2.destroyAllWindows()
 
 ##########################################
 ### Visualize feature filters manually ###
@@ -108,24 +110,25 @@ imgTensor = torch.FloatTensor(img.reshape(1, 1, IMAGE_SIZE, IMAGE_SIZE))
 ##########################################
 ##########################################
 
-exit()
 
 ### Visualize feature filter with hook
-noise = torch.rand(1, 1, 128, 128, requires_grad=True)
-noise.data = noise.data / 10 + 0.45
-optimizer = torch.optim.Adam([noise], lr=0.1, weight_decay=1e-6)
+noise = torch.rand(1, 1, IMAGE_SIZE, IMAGE_SIZE, requires_grad=True, device="cuda")
+# noise.data = noise.data / 10 + 0.45
+optimizer = torch.optim.Adam([noise], lr=0.01, weight_decay=1e-6)
 s = SaveFeatures(model.layer1)
-for i in range(0, 0):
-	print(i, np.min(noise.data.numpy()), np.max(noise.data.numpy()))
-	model(imgTensor)
-	loss = -s.features[0, 5].mean()
+for i in range(0, 1000):
+	print(i, np.min(noise.cpu().data.numpy()), np.max(noise.cpu().data.numpy()))
+	model(noise)
+	loss = -s.features[0][1].mean()
+	# loss = -model.
+	print(loss)
 	optimizer.zero_grad()
 	loss.backward()
 	optimizer.step()
 	if i % 10 == 0:
-		cv2.imshow("noise", enlarge(noise[0][0].data.numpy()))
-		cv2.imshow("noiseNorm", enlarge(normalize(noise[0][0].data.numpy())))
-	if cv2.waitKey(10) & 0xFF == ord('q'):
+		cv2.imshow("noise", enlarge(noise.cpu()[0][0].data.numpy()))
+		cv2.imshow("noiseNorm", enlarge(normalize(noise.cpu()[0][0].data.numpy())))
+	if cv2.waitKey(1) & 0xFF == ord('q'):
 		break
 s.close()
 
