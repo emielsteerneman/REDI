@@ -3,6 +3,7 @@ import torch
 import cv2
 import numpy as np
 from torchsummary import summary
+import matplotlib.pyplot as plt 
 
 def enlarge(_im):
 	im = _im.copy()
@@ -31,7 +32,8 @@ model, date, IMAGE_SIZE, NCLASSES, NFILES = dataloader.loadModelFromDir(modelDir
 
 model.to(device)
 
-# summary(model, (1, 128, 128), 1, "cpu")
+summary(model, (1, 128, 128), 1)
+exit()
 for name, param in model.named_parameters():
 	print(name.ljust(20), param.size())
 
@@ -42,6 +44,9 @@ imgTensor = torch.FloatTensor(img.reshape(1, 1, IMAGE_SIZE, IMAGE_SIZE))
 # cv2.waitKey(0)
 # cv2.destroyAllWindows()
 
+##########################################
+### Visualize image after first filter ###
+##########################################
 # accumulate = np.zeros((280, 1120), dtype=np.uint8)
 # output = model.layer1(imgTensor)
 # images = output.data[0].numpy()
@@ -52,40 +57,57 @@ imgTensor = torch.FloatTensor(img.reshape(1, 1, IMAGE_SIZE, IMAGE_SIZE))
 # cv2.imshow("accumulate", accumulate)
 # cv2.imshow("First", enlarge(normalize(images[0])))
 
-lyr = torch.nn.Sequential(torch.nn.Conv2d(in_channels=1, out_channels=1, kernel_size=5, stride=1, padding=2), torch.nn.ReLU()).to(device)
 
 ##########################################
 ### Visualize feature filters manually ###
 ##########################################
-accumulate = np.zeros((128*8, 128*8), dtype=np.float32)
-for iFeature in range(0, 64):
-	print(iFeature)
-	with torch.no_grad(): # see https://discuss.pytorch.org/t/layer-weight-vs-weight-data/24271/2?u=ptrblck
-		lyr[0].weight[0] = model.layer1[0].weight[iFeature]
-		lyr[0].bias[0]   = model.layer1[0].bias[iFeature]
+# lyr = torch.nn.Sequential(torch.nn.Conv2d(in_channels=1, out_channels=1, kernel_size=5, stride=1, padding=2), torch.nn.ReLU()).to(device)
+# accumulate = np.zeros((IMAGE_SIZE*8, IMAGE_SIZE*8), dtype=np.float32)
+# for iFeature in range(0, 64):
+# 	with torch.no_grad(): # see https://discuss.pytorch.org/t/layer-weight-vs-weight-data/24271/2?u=ptrblck
+# 		lyr[0].weight[0] = model.layer1[0].weight[iFeature]
+# 		lyr[0].bias[0]   = model.layer1[0].bias[iFeature]
 
-	dx, dy = iFeature % 8, iFeature // 8
-	px, py = dx*128, dy*128
+# 	dx, dy = iFeature % 8, iFeature // 8
+# 	px, py = dx*IMAGE_SIZE, dy*IMAGE_SIZE
 	
-	noise = torch.rand(1, 1, 128, 128, requires_grad=True, device="cuda")
-	noise.data = noise.data / 10 + 0.45
+# 	noise = torch.rand(1, 1, IMAGE_SIZE, IMAGE_SIZE, requires_grad=True, device="cuda")
+# 	noise.data = noise.data / 10 + 0.45
 
-	optimizer = torch.optim.Adam([noise], lr=0.01, weight_decay=1e-6)
-	for i in range(0, 4000):
-		# print(i, np.min(noise.data.numpy()), np.max(noise.data.numpy()))
-		out = lyr(noise)	
-		loss = -out.mean()
-		optimizer.zero_grad()
-		loss.backward()
-		optimizer.step()
-		# if i % 10 == 0:
-		# 	cv2.imshow("noiseNorm", enlarge(normalize(noise.cpu()[0][0].data.numpy())))
-		# if cv2.waitKey(10) & 0xFF == ord('q'):
-		# 	break
-	accumulate[py:py+128, px:px+128] = normalize(noise.cpu().detach().numpy())
-	cv2.imshow("accumulate", accumulate)
-	cv2.waitKey(1)
-cv2.waitKey(0)
+# 	optimizer = torch.optim.Adam([noise], lr=0.01, weight_decay=1e-6)
+# 	for i in range(0, 1000):
+# 		out = lyr(noise)		
+# 		loss = -out.mean()		
+# 		optimizer.zero_grad()	
+# 		loss.backward()			
+# 		optimizer.step()
+		
+# 		### Visualize evolution of noise
+# 		# if i % 10 == 0:
+# 		# 	cv2.imshow("noiseNorm", enlarge(normalize(noise.cpu()[0][0].data.numpy())))
+# 		# if cv2.waitKey(1) & 0xFF == ord('q'):
+# 		# 	exit()
+
+# 	### Normalize data to create a clearer image
+# 	data = noise.cpu().data.numpy().reshape(IMAGE_SIZE, IMAGE_SIZE)
+# 	q10, q90 = np.percentile(data, [10, 90])
+# 	data -= q10
+# 	data /= q10-q90
+
+# 	accumulate[py:py+128, px:px+128] = data
+# 	cv2.imshow("accumulate", accumulate)
+# 	cv2.waitKey(1)
+
+# 	### Show histogram of pixels
+# 	# hist, bins = np.histogram(data, bins=np.arange(np.min(data), np.max(data), 0.01))
+# 	# plt.bar(bins[:-1], hist, width=1)
+# 	# plt.ylim(top=max(hist)*1.5)
+# 	# plt.show()
+# cv2.waitKey(0)	
+##########################################
+##########################################
+##########################################
+
 exit()
 
 ### Visualize feature filter with hook
