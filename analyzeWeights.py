@@ -19,7 +19,6 @@ class SaveFeatures():
     def __init__(self, module):
         self.hook = module.register_forward_hook(self.hook_fn)
     def hook_fn(self, module, input, output):
-        print("Activation called!", output.size())
         self.features = output
         # self.features = torch.tensor(output,requires_grad=True)
         # self.features = output.clone().detach().requires_grad_(True)
@@ -29,7 +28,7 @@ class SaveFeatures():
 # Select device
 device = torch.device("cuda:0" if torch.cuda.is_available() else "cpu")
 
-modelDir = "model_190531-025542_128_10_80"
+modelDir = "model_190602-122056_128_10_80"
 model, date, IMAGE_SIZE, NCLASSES, NFILES = dataloader.loadModelFromDir(modelDir)
 
 model.to(device)
@@ -60,10 +59,12 @@ imgTensor = torch.FloatTensor(img.reshape(1, 1, IMAGE_SIZE, IMAGE_SIZE)).cuda()
 # cv2.waitKey(0)
 # cv2.destroyAllWindows()
 
+
+
 ##########################################
 ### Visualize feature filters manually ###
 ##########################################
-# lyr = torch.nn.Sequential(torch.nn.Conv2d(in_channels=1, out_channels=1, kernel_size=5, stride=1, padding=2), torch.nn.ReLU()).to(device)
+# lyr = torch.nn.Sequential(torch.nn.Conv2d(in_channels=1, out_channels=1, kernel_size=5, stride=1, padding=2), torch.nn.ReLU(), torch.nn.MaxPool2d(kernel_size=2, stride=2)).to(device)
 # accumulate = np.zeros((IMAGE_SIZE*8, IMAGE_SIZE*8), dtype=np.float32)
 # for iFeature in range(0, 64):
 # 	with torch.no_grad(): # see https://discuss.pytorch.org/t/layer-weight-vs-weight-data/24271/2?u=ptrblck
@@ -77,7 +78,7 @@ imgTensor = torch.FloatTensor(img.reshape(1, 1, IMAGE_SIZE, IMAGE_SIZE)).cuda()
 # 	noise.data = noise.data / 10 + 0.45
 
 # 	optimizer = torch.optim.Adam([noise], lr=0.01, weight_decay=1e-6)
-# 	for i in range(0, 1000):
+# 	for i in range(0, 2500):
 # 		out = lyr(noise)		
 # 		loss = -out.mean()		
 # 		optimizer.zero_grad()	
@@ -93,10 +94,12 @@ imgTensor = torch.FloatTensor(img.reshape(1, 1, IMAGE_SIZE, IMAGE_SIZE)).cuda()
 # 	### Normalize data to create a clearer image
 # 	data = noise.cpu().data.numpy().reshape(IMAGE_SIZE, IMAGE_SIZE)
 # 	q10, q90 = np.percentile(data, [10, 90])
-# 	data -= q10
-# 	data /= q10-q90
-
+# 	data[data < q10] = q10
+# 	data[q90 < data] = q90
+# 	data -= np.min(data)
+# 	data /= np.max(data)
 # 	accumulate[py:py+128, px:px+128] = data
+	
 # 	cv2.imshow("accumulate", accumulate)
 # 	cv2.waitKey(1)
 
@@ -105,34 +108,95 @@ imgTensor = torch.FloatTensor(img.reshape(1, 1, IMAGE_SIZE, IMAGE_SIZE)).cuda()
 # 	# plt.bar(bins[:-1], hist, width=1)
 # 	# plt.ylim(top=max(hist)*1.5)
 # 	# plt.show()
-# cv2.waitKey(0)	
+# print("%s/accumulate_%d.png" % (modelDir, 0))
+# print(np.min(accumulate), np.max(accumulate))
+# cv2.imwrite("%s/accumulate_manual_%d.png" % (modelDir, 0), accumulate*255)
+# cv2.waitKey(0)
 ##########################################
 ##########################################
 ##########################################
 
 
-### Visualize feature filter with hook
-noise = torch.rand(1, 1, IMAGE_SIZE, IMAGE_SIZE, requires_grad=True, device="cuda")
-# noise.data = noise.data / 10 + 0.45
-optimizer = torch.optim.Adam([noise], lr=0.01, weight_decay=1e-6)
-s = SaveFeatures(model.layer1)
-for i in range(0, 1000):
-	print(i, np.min(noise.cpu().data.numpy()), np.max(noise.cpu().data.numpy()))
-	model(noise)
-	loss = -s.features[0][1].mean()
-	# loss = -model.
-	print(loss)
-	optimizer.zero_grad()
-	loss.backward()
-	optimizer.step()
-	if i % 10 == 0:
-		cv2.imshow("noise", enlarge(noise.cpu()[0][0].data.numpy()))
-		cv2.imshow("noiseNorm", enlarge(normalize(noise.cpu()[0][0].data.numpy())))
-	if cv2.waitKey(1) & 0xFF == ord('q'):
-		break
-s.close()
+
+##########################################
+### Visualize feature filter with hook ###
+##########################################
+for iLayer, layer in enumerate(model.convLayers):
+	if iLayer != 4:
+		continue
+	print("Layer %d" % iLayer)
+	accumulate = np.zeros((IMAGE_SIZE*8, IMAGE_SIZE*8), dtype=np.float32)
+	for iFeature in range(0, 64):
+
+		STEPS = 12
+		INITIAL_SIZE = 16
+
+		dx, dy = iFeature % 8, iFeature // 8
+		px, py = dx*IMAGE_SIZE, dy*IMAGE_SIZE
+		
+		noise = torch.rand(1, 1, IMAGE_SIZE, IMAGE_SIZE, requires_grad=True, device="cuda")
+		noise.data = noise.data / 10 + 0.45
+		
+		optimizer = torch.optim.Adam([noise], lr=0.01, weight_decay=1e-6)
+		sf = SaveFeatures(model.convLayers[iLayer])
+		
+		for iStep in range(0, STEPS):
+			size = int(INITIAL_SIZE * 1.22**iStep)
+			print(iStep, "%dx%d" % (size, size))
+
+			noise = noise.cpu().data.numpy()[0][0]
+			noise = cv2.resize(noise, (size, size), interpolation=cv2.INTER_CUBIC)
+			noise = noise.reshape(1, 1, size, size)
+			noise = torch.FloatTensor(noise).cuda()
+			noise.requires_grad=True
+			optimizer = torch.optim.Adam([noise], lr=0.01, weight_decay=1e-6)
+
+			for i in range(0, 5000):
+
+				# if i % IMAGE_SIZE == 0 and 0 < i:
+				# 	print("Resizing", i, i // STEPS, noise.size())
+				# 	SIZE = (i+IMAGE_SIZE) // STEPS
+				# 	noise = noise.cpu().data.numpy()[0][0]
+				# 	# print(noise)
+				# 	print(noise.shape)
+				# 	noise = cv2.resize(noise, (SIZE, SIZE), interpolation=cv2.INTER_CUBIC)
+				# 	noise = noise.reshape(1, 1, SIZE, SIZE)
+				# 	print(noise.shape)
+				# 	noise = torch.FloatTensor(noise).cuda()
 
 
+				model(noise)
+				loss = -sf.features[0][iFeature].mean()
+				optimizer.zero_grad()
+				loss.backward()
+				optimizer.step()
+				
+				### Visualize evolution of noise
+				# if i % 250 == 0:
+				# 	cv2.imshow("noiseNorm", enlarge(normalize(noise.cpu()[0][0].data.numpy())))
+				# if cv2.waitKey(1) & 0xFF == ord('q'):
+				# 	exit()
+		sf.close()
+
+		cv2.imshow("finalNoise", enlarge(normalize(noise.cpu()[0][0].data.numpy())))
+		### Normalize data to create a clearer image
+		data = noise.cpu().data.numpy()[0][0]
+		data = cv2.resize(data, (IMAGE_SIZE, IMAGE_SIZE), interpolation=cv2.INTER_CUBIC)
+		q10, q90 = np.percentile(data, [10, 90])
+		data[data < q10] = q10
+		data[q90 < data] = q90
+		data -= np.min(data)
+		data /= np.max(data)
+		accumulate[py:py+128, px:px+128] = data
+		
+		cv2.imshow("accumulate %d" % iLayer, accumulate)
+		cv2.waitKey(1)
+
+	cv2.imwrite("%s/accumulate_%d.png" % (modelDir, iLayer), accumulate)
+cv2.waitKey(0)
+##########################################
+##########################################
+##########################################
 exit()
 
 
@@ -177,4 +241,67 @@ for i, x in enumerate(w):
 cv2.imshow("Image", img)
 cv2.waitKey(0)
 cv2.destroyAllWindows()
+
+
+
+
+
+
+
+
+
+
+
+
+
+def visualize(self, layer, filter, lr=0.1, opt_steps=20, blur=None):
+    sz = self.size
+    img = np.uint8(np.random.uniform(150, 180, (sz, sz, 3)))/255  # generate random image
+    activations = SaveFeatures(list(self.model.children())[layer])  # register hook
+
+    for _ in range(self.upscaling_steps):  # scale the image up upscaling_steps times
+        train_tfms, val_tfms = tfms_from_model(vgg16, sz)
+        img_var = V(val_tfms(img)[None], requires_grad=True)  # convert image to Variable that requires grad
+        optimizer = torch.optim.Adam([img_var], lr=lr, weight_decay=1e-6)
+        for n in range(opt_steps):  # optimize pixel values for opt_steps times
+            optimizer.zero_grad()
+            self.model(img_var)
+            loss = -activations.features[0, filter].mean()
+            loss.backward()
+            optimizer.step()
+        img = val_tfms.denorm(img_var.data.cpu().numpy()[0].transpose(1,2,0))
+        self.output = img
+        sz = int(self.upscaling_factor * sz)  # calculate new image size
+        img = cv2.resize(img, (sz, sz), interpolation = cv2.INTER_CUBIC)  # scale image up
+        if blur is not None: img = cv2.blur(img,(blur,blur))  # blur image to reduce high frequency patterns
+    self.save(layer, filter)
+    activations.close()
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+    
+
+
+
+
+
+
+
+
+
+
+
+
+
 
