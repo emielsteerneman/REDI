@@ -122,14 +122,14 @@ imgTensor = torch.FloatTensor(img.reshape(1, 1, IMAGE_SIZE, IMAGE_SIZE)).cuda()
 ### Visualize feature filter with hook ###
 ##########################################
 for iLayer, layer in enumerate(model.convLayers):
-	if iLayer != 4:
+	if iLayer != 0:
 		continue
 	print("Layer %d" % iLayer)
 	accumulate = np.zeros((IMAGE_SIZE*8, IMAGE_SIZE*8), dtype=np.float32)
 	for iFeature in range(0, 64):
 
 		STEPS = 12
-		INITIAL_SIZE = 16
+		INITIAL_SIZE = 128
 
 		dx, dy = iFeature % 8, iFeature // 8
 		px, py = dx*IMAGE_SIZE, dy*IMAGE_SIZE
@@ -144,14 +144,14 @@ for iLayer, layer in enumerate(model.convLayers):
 			size = int(INITIAL_SIZE * 1.22**iStep)
 			print(iStep, "%dx%d" % (size, size))
 
-			noise = noise.cpu().data.numpy()[0][0]
-			noise = cv2.resize(noise, (size, size), interpolation=cv2.INTER_CUBIC)
-			noise = noise.reshape(1, 1, size, size)
-			noise = torch.FloatTensor(noise).cuda()
-			noise.requires_grad=True
+			# noise = noise.cpu().data.numpy()[0][0]
+			# noise = cv2.resize(noise, (size, size), interpolation=cv2.INTER_CUBIC)
+			# noise = noise.reshape(1, 1, size, size)
+			# noise = torch.FloatTensor(noise).cuda()
+			# noise.requires_grad=True
 			optimizer = torch.optim.Adam([noise], lr=0.01, weight_decay=1e-6)
 
-			for i in range(0, 5000):
+			for i in range(0, 50):
 
 				# if i % IMAGE_SIZE == 0 and 0 < i:
 				# 	print("Resizing", i, i // STEPS, noise.size())
@@ -171,14 +171,14 @@ for iLayer, layer in enumerate(model.convLayers):
 				loss.backward()
 				optimizer.step()
 				
-				### Visualize evolution of noise
-				# if i % 250 == 0:
-				# 	cv2.imshow("noiseNorm", enlarge(normalize(noise.cpu()[0][0].data.numpy())))
-				# if cv2.waitKey(1) & 0xFF == ord('q'):
-				# 	exit()
+				## Visualize evolution of noise
+				if i % 1 == 0:
+					cv2.imshow("noiseNorm", enlarge(normalize(noise.cpu()[0][0].data.numpy())))
+				if cv2.waitKey(1) & 0xFF == ord('q'):
+					exit()
 		sf.close()
 
-		cv2.imshow("finalNoise", enlarge(normalize(noise.cpu()[0][0].data.numpy())))
+		# cv2.imshow("finalNoise", enlarge(normalize(noise.cpu()[0][0].data.numpy())))
 		### Normalize data to create a clearer image
 		data = noise.cpu().data.numpy()[0][0]
 		data = cv2.resize(data, (IMAGE_SIZE, IMAGE_SIZE), interpolation=cv2.INTER_CUBIC)

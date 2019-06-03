@@ -67,8 +67,8 @@ def loadModelFromDir(modelDir):
 	network = importlib.import_module(".network", package=modelDir)
 
 	# model_190530-011512_128_250_80
-	[_, date, IMAGE_SIZE, NCLASSES, NFILES] = modelDir.split("_")
-	IMAGE_SIZE, NCLASSES, NFILES = int(IMAGE_SIZE), int(NCLASSES), int(NFILES)
+	[_, date, NCLASSES, NFILES, NBATCHES, NLAYERS, NCHANNELS, IMAGE_SIZE] = modelDir.split("_")
+	NCLASSES, NFILES, NBATCHES, NLAYERS, NCHANNELS, IMAGE_SIZE = int(NCLASSES), int(NFILES), int(NBATCHES), int(NLAYERS), int(NCHANNELS), int(IMAGE_SIZE)
 	### Get latest weights
 	models = os.listdir(modelDir)
 	models = list(filter(lambda x : x.endswith(".model"), models))
@@ -79,4 +79,4 @@ def loadModelFromDir(modelDir):
 	### Create model and restore weights
 	model = network.ConvNet(NCLASSES, IMAGE_SIZE)
 	model.load_state_dict(modelWeights)
-	return model, date, IMAGE_SIZE, NCLASSES, NFILES
+	return model, date, NCLASSES, NFILES, NBATCHES, NLAYERS, NCHANNELS, IMAGE_SIZE

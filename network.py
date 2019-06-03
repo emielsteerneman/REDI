@@ -4,7 +4,7 @@ from torch.autograd import Variable
 
 ### https://adventuresinmachinelearning.com/convolutional-neural-networks-tutorial-in-pytorch/
 class ConvNet(nn.Module):
-	def __init__(self, nClasses, imageSize, nConvLayers=3, device="cpu"):
+	def __init__(self, nClasses, imageSize, nConvLayers=3, nchannels=32):
 		super(ConvNet, self).__init__()
 		print("[Network] ", end="")
 
@@ -12,9 +12,9 @@ class ConvNet(nn.Module):
 
 		### CONVOLUTIONAL ###
 		for iConvLayer in range(nConvLayers):
-			in_channels = 1 if iConvLayer == 0 else 16
+			in_channels = 1 if iConvLayer == 0 else nchannels
 			layer = nn.Sequential(
-				nn.Conv2d(in_channels=in_channels, out_channels=16, kernel_size=5, stride=1, padding=2),
+				nn.Conv2d(in_channels=in_channels, out_channels=nchannels, kernel_size=5, stride=1, padding=2),
 				nn.ReLU(),
 				nn.MaxPool2d(kernel_size=2, stride=2))
 			self.convLayers.append(layer)
@@ -32,7 +32,7 @@ class ConvNet(nn.Module):
 		self.drop_out = nn.Dropout()
 		print("|dropout|", end="")
 
-		self.fc = nn.Linear(in_features=16*8*8, out_features=nClasses)
+		self.fc = nn.Linear(in_features=nchannels*8*8, out_features=nClasses)
 		print("1x%d -> 1x%d" % (self.fc.in_features, self.fc.out_features))
 
 	def forward(self, x):
