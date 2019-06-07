@@ -25,8 +25,8 @@ torch.cuda.empty_cache()
 
 NCLASSES = 10
 NFILES = 80
-IMAGE_SIZE = 16
-EPOCHS = 1000
+IMAGE_SIZE = 64
+EPOCHS = 200
 NBATCHES = 1# NCLASSES * NFILES * 0.5
 NLAYERS = 3
 NCHANNELS = 10
@@ -40,41 +40,6 @@ data, iClasses, classToLabel = None, None, None
 
 print("Loading and preprocessing images..")
 data, iClasses, classToLabel = dataloader.loadAndPrepAllImages(NCLASSES, NFILES, IMAGE_SIZE)
-
-# if True:
-# 	print("Loading and preprocessing images..")
-# 	data, iClasses, classToLabel = dataloader.loadAndPrepAllImages(NCLASSES, NFILES, IMAGE_SIZE)
-# 	if False:
-# 		print("Storing files as pickles..")
-# 		with open("data.pickle", 'wb') as pickle_file:
-# 			pickle.dump(data, pickle_file, pickle.HIGHEST_PROTOCOL)
-# 		with open("iClasses.pickle", 'wb') as pickle_file:
-# 			pickle.dump(iClasses, pickle_file, pickle.HIGHEST_PROTOCOL)
-# 		with open("classToLabel.pickle", 'wb') as pickle_file:
-# 			pickle.dump(classToLabel, pickle_file, pickle.HIGHEST_PROTOCOL)
-# else:
-# 	print("Loading pickles..")
-# 	with open("data.pickle", "rb") as pickle_file:
-# 	   data = pickle.load(pickle_file)
-# 	with open("iClasses.pickle", "rb") as pickle_file:
-# 	   iClasses = pickle.load(pickle_file)
-# 	with open("classToLabel.pickle", "rb") as pickle_file:
-# 	   classToLabel = pickle.load(pickle_file)
-
-# ### ROTATE IMAGES ###
-# _iClasses = []
-# _data = []
-# for (d, c) in zip(data, iClasses):
-# 	print("\rRotating images.. %d" % c, end="")
-# 	_d = d.reshape((IMAGE_SIZE, IMAGE_SIZE))
-# 	for i in range(4):
-# 		_d = np.rot90(_d)
-# 		_data.append(_d.reshape((1, IMAGE_SIZE, IMAGE_SIZE)))
-# 		_iClasses.append(c)
-# print("\rRotating images.. images rotated")
-# data = _data
-# iClasses = _iClasses
-
 
 print("Converting data to Tensors and moving data to device.. ")
 ### Split data into test and train ###
@@ -132,17 +97,18 @@ for i in range(0, EPOCHS):
 		optimizer.step()
 
 	### Calculate accuracy
-	acc = 0.0
+	acc, loss = 0, 0
 	for nB in range(0, NTRAIN, batchSize):
 		print("\r  Accuracy %d/%d" % (nB+batchSize, NTRAIN), end=" "*20, flush=True)
 		# Forward pass
 		y = model(dataTrain[nB:nB+batchSize])
+		loss += criterion(y, labelsTrain[nB:nB+batchSize])
 		_, predicted = torch.max(y.data, 1)
 		correct = (predicted == labelsTrain[nB:nB+batchSize]).sum().item()
 		acc += correct / batchSize
 	acc = acc / NBATCHES
 
-	print("\r  epoch=%d" % i, "accuracy=%0.2f" % acc)
+	print("\r  epoch=%d" % i, "loss=%4.2f" % loss, "accuracy=%0.2f" % acc)
 	
 	### Store current model
 	torch.save(model.state_dict(), modelDir + "/%d_%0.2f.model" % (i, acc))
