@@ -77,6 +77,11 @@ def loadModelFromDir(modelDir):
 	print("[dataloader] Loading weights from " + modelDir + "/" + weightsFile)
 	modelWeights = torch.load(modelDir + "/" + weightsFile)
 	### Create model and restore weights
-	model = network.ConvNet(NCLASSES, IMAGE_SIZE)
+	model = network.ConvNet(NCLASSES, imageSize=IMAGE_SIZE, nConvLayers=NLAYERS, nchannels=NCHANNELS)
 	model.load_state_dict(modelWeights)
 	return model, date, NCLASSES, NFILES, NBATCHES, NLAYERS, NCHANNELS, IMAGE_SIZE
+
+def loadLatestModel(folder="./"):
+	models = list(filter(lambda f : f.startswith("model_"), os.listdir(folder)))
+	models.sort(reverse=True)	
+	return loadModelFromDir(models[0])
