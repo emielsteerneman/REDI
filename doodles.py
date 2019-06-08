@@ -14,7 +14,6 @@ import cv2
 from torchsummary import summary
 
 print("\n\nDoodle CNN")
-print("Programmed for pytorch v1.0.0")
 torch.cuda.empty_cache()
 
 # Image.fromarray(imData * 255).resize((1000, 1000)).show()
@@ -23,10 +22,10 @@ torch.cuda.empty_cache()
 #####################################################################################
 #####################################################################################
 
-NCLASSES = 10
+NCLASSES = 8
 NFILES = 80
 IMAGE_SIZE = 64
-EPOCHS = 200
+EPOCHS = 100
 NBATCHES = 1# NCLASSES * NFILES * 0.5
 NLAYERS = 3
 NCHANNELS = 10
@@ -39,7 +38,8 @@ device = torch.device("cuda:0" if torch.cuda.is_available() else "cpu")
 data, iClasses, classToLabel = None, None, None
 
 print("Loading and preprocessing images..")
-data, iClasses, classToLabel = dataloader.loadAndPrepAllImages(NCLASSES, NFILES, IMAGE_SIZE)
+classes = ["airplane", "radio", "parachute", "screwdriver", "cat", "pizza", "zebra", "crab"]
+data, iClasses, classToLabel = dataloader.loadAndPrepAllImages(NCLASSES, NFILES, IMAGE_SIZE, classes=classes)
 
 print("Converting data to Tensors and moving data to device.. ")
 ### Split data into test and train ###
@@ -67,6 +67,9 @@ nowStr = datetime.now().strftime("%y%m%d-%H%M%S")
 modelDir = "model_%s_%d_%d_%d_%d_%d_%d" % (nowStr, NCLASSES, NFILES, NBATCHES, NLAYERS, NCHANNELS, IMAGE_SIZE)
 os.mkdir(modelDir)
 copyfile("./network.py", modelDir + "/network.py")
+f = open(modelDir + "/classes.txt", "w")
+f.write(" ".join(classes))
+f.close()
 
 ### Profile storage ###
 dataInGb   = sum([d.nbytes for d in data]) / 1e9
@@ -112,8 +115,6 @@ for i in range(0, EPOCHS):
 	
 	### Store current model
 	torch.save(model.state_dict(), modelDir + "/%d_%0.2f.model" % (i, acc))
-
-
 
 ### Calculate accuracy
 print("\nTesting CNN on cpu..")

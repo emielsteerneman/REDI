@@ -30,17 +30,27 @@ def loadAndPrepImage(imPath, imsize=64):
 
 	return prepImage(im, imsize)	
 
-def loadAndPrepAllImages(nClasses = 250, nFiles = 80, imsize=64, rootfolder="./sketches_png"):
-	print("\n[dataloader] Loading and preparing %d classes with %d images each :" % (nClasses, nFiles), end=" ", flush=True)
-	# Retrieve all classes	
-	classes = []
-	for classDir in os.listdir(rootfolder):
-		if len(classes) == nClasses:
-			break
-		if not os.path.isfile(rootfolder + "/" + classDir):
-			classes.append(classDir)
+def loadAndPrepAllImages(nClasses = None, nFiles = 80, imsize=64, rootfolder="./sketches_png", classes=None):
+	if nClasses == None and classes == None:
+		nClasses = 250
+	
+	if nClasses == None and classes != None:
+		nClasses = len(classes)
 
-	classes.sort() # Assure that classes will always have the same class label
+	if nClasses != None and classes != None:
+		if nClasses != len(classes):	
+			print("Error! nClasses(%d) != len(classes)(%d)" % (nClasses, len(classes)))
+			exit()
+
+	print("\n[dataloader] Loading and preparing %d classes with %d images each :" % (nClasses, nFiles), end=" ", flush=True)
+	if classes == None:
+		# Retrieve all classes	
+		classes = []
+		for classDir in os.listdir(rootfolder):
+			if not os.path.isfile(rootfolder + "/" + classDir):
+				classes.append(classDir)
+		classes.sort()
+		classes = classes[:nClasses]
 
 	data = []
 	iClasses = []
@@ -49,7 +59,6 @@ def loadAndPrepAllImages(nClasses = 250, nFiles = 80, imsize=64, rootfolder="./s
 	# Load all files for all classes
 	for iC, c in enumerate(classes):
 		print("%s(%d)" % (c, iC), end=", ", flush=True)
-
 
 		classToLabel[iC] = c # Store int => class
 		classDir = rootfolder + "/" + c
@@ -66,9 +75,11 @@ def loadAndPrepAllImages(nClasses = 250, nFiles = 80, imsize=64, rootfolder="./s
 def loadModelFromDir(modelDir):
 	network = importlib.import_module(".network", package=modelDir)
 
-	# model_190530-011512_128_250_80
+	### Retrieve information from directory name (model_190530-011512_128_250_80)
 	[_, date, NCLASSES, NFILES, NBATCHES, NLAYERS, NCHANNELS, IMAGE_SIZE] = modelDir.split("_")
 	NCLASSES, NFILES, NBATCHES, NLAYERS, NCHANNELS, IMAGE_SIZE = int(NCLASSES), int(NFILES), int(NBATCHES), int(NLAYERS), int(NCHANNELS), int(IMAGE_SIZE)
+	### Load classes
+	CLASSES = open(modelDir + "/classes.txt").read().split(" ")
 	### Get latest weights
 	models = os.listdir(modelDir)
 	models = list(filter(lambda x : x.endswith(".model"), models))
@@ -79,7 +90,7 @@ def loadModelFromDir(modelDir):
 	### Create model and restore weights
 	model = network.ConvNet(NCLASSES, imageSize=IMAGE_SIZE, nConvLayers=NLAYERS, nchannels=NCHANNELS)
 	model.load_state_dict(modelWeights)
-	return model, date, NCLASSES, NFILES, NBATCHES, NLAYERS, NCHANNELS, IMAGE_SIZE
+	return model, date, NCLASSES, NFILES, NBATCHES, NLAYERS, NCHANNELS, IMAGE_SIZE, CLASSES
 
 def loadLatestModel(folder="./"):
 	models = list(filter(lambda f : f.startswith("model_"), os.listdir(folder)))

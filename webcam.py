@@ -9,23 +9,28 @@ import numpy as np
 import time
 import sys
 
+# Numpy pretty print
+np.set_printoptions(precision=2)
+
 ### Load model
 modelDir = None
 if modelDir == None:
 	if len(sys.argv) == 1:
-		model, date, NCLASSES, NFILES, NBATCHES, NLAYERS, NCHANNELS, IMAGE_SIZE = dataloader.loadLatestModel()
+		model, date, NCLASSES, NFILES, NBATCHES, NLAYERS, NCHANNELS, IMAGE_SIZE, CLASSES = dataloader.loadLatestModel()
 	else:
-		model, date, NCLASSES, NFILES, NBATCHES, NLAYERS, NCHANNELS, IMAGE_SIZE = dataloader.loadModelFromDir(sys.argv[1])
+		model, date, NCLASSES, NFILES, NBATCHES, NLAYERS, NCHANNELS, IMAGE_SIZE, CLASSES = dataloader.loadModelFromDir(sys.argv[1])
 else:
-	model, date, NCLASSES, NFILES, NBATCHES, NLAYERS, NCHANNELS, IMAGE_SIZE = dataloader.loadModelFromDir(modelDir)
+	model, date, NCLASSES, NFILES, NBATCHES, NLAYERS, NCHANNELS, IMAGE_SIZE, CLASSES = dataloader.loadModelFromDir(modelDir)
+
+# Set model to evaluation mode (disables dropout layers)
+model.eval()
 
 ### Load class labels
-_, _, classToLabel = dataloader.loadAndPrepAllImages(NCLASSES, 1, 1)
-classToLabel = classToLabel[0:NCLASSES]
 predictions = {}
-for c in classToLabel:
+for c in CLASSES:
 	predictions[c] = 0.0
 
+print("Opening webcam...")
 cap = cv2.VideoCapture(0)
 
 # cap.set(cv2.CAP_PROP_FRAME_WIDTH, 1920)
@@ -35,65 +40,76 @@ cap.set(cv2.CAP_PROP_FPS, 30)
 WIDTH  = int(cap.get(cv2.CAP_PROP_FRAME_WIDTH))
 HEIGHT = int(cap.get(cv2.CAP_PROP_FRAME_HEIGHT))
 
-# writer = cv2.VideoWriter("/home/emiel/Desktop/REDI.mp4", cv2.VideoWriter_fourcc(*'XVID'), 20, (WIDTH, HEIGHT))
+# writer = cv2.VideoWriter("/home/emiel/Desktop/REDI_.mp4", cv2.VideoWriter_fourcc(*'XVID'), 30, (WIDTH, HEIGHT))
 
+print("Adding hooks to model..")
 layerOutputs = [None] * len(model.convLayers) 
 
-def wer(iLayer, module, input, output):
-	print(iLayer, "triggered")
+def hook_fn(iLayer, module, input, output):
+	# Get data
 	activations = output.data[0].numpy().copy()
-	# activations = activations.reshape(1, )
-	print(activations.shape, activations.shape[-1])	
-	activations = activations.reshape((NCHANNELS, activations.shape[-1] * activations.shape[-1]))
-	print(activations.shape, activations.shape[-1])
-	activations = activations.mean(axis=1)
-	print(activations)
-	print(activations.shape, activations.shape[-1])
+	# Get average of activations
+	activations = activations.max(axis=(1, 2))
+	layerOutputs[iLayer] = activations
+	print(iLayer, "triggered", activations)
 
-	# print(output.data.numpy())
-	# print(iLayer, output.data.numpy().shape)
-	# layerOutputs[iLayer] = output.data.numpy()
 
 ### Add hooks to model
 for iLayer, layer in enumerate(model.convLayers):
 	# Ugly hack to create a closure for the variable iLayer. https://stackoverflow.com/a/2295368/2165613
-	layer.register_forward_hook(	(lambda iL : lambda module, input, output : wer(iL, module, input, output))(iLayer)		)
-	print(layer)
+	layer.register_forward_hook(	(lambda iL : lambda module, input, output : hook_fn(iL, module, input, output))(iLayer)		)
 
-#exit()
+print("Loading single image..")
+airplane = dataloader.loadAndPrepImage("sketches_png/apple/322.png", imsize=IMAGE_SIZE).reshape(IMAGE_SIZE, IMAGE_SIZE)
 
 
 def classifyImage(model, image):
 	image = cv2.resize(image, (IMAGE_SIZE, IMAGE_SIZE), interpolation=cv2.INTER_LANCZOS4)
-	im = np.array(image) / 255
-	im -= np.min(im)
-	if np.max(im) != 0:
-		im /= np.max(im)
-	im = 1 - im
+	
+	## Convert image to range [0, 1] and normalize
+	im = np.array(image) / 255	# Convert image to range [0, 1]
+	im -= np.min(im)			# Normalize image
+	if np.max(im) != 0:			# Normalize image
+		im /= np.max(im)		# Normalize image
+	im = 1 - im 				# Invert image. Black drawing becomes white
 
-	indices = im < 0.2
-	im[indices] = 0
-	im[~indices]= 1
+	## Convert image to binary
+	indices = im < 0.2			# Threshold image
+	im[indices] = 0				# Float to binary
+	im[~indices]= 1				# Float to binary
 
+	## Convert to FloatTensor and put through network
 	_input = torch.FloatTensor( im.reshape(1, 1, IMAGE_SIZE, IMAGE_SIZE) )
 	output = model(_input)
 	
 	output = output.data[0].numpy()
 	output[output < 0] = 0
-	output /= max(output)
-	output = list(zip(output, classToLabel))
+	if max(output) != 0:
+		output /= max(output)
+	output = list(zip(output, CLASSES))
 
 	return output, im
 
 
+
+# while True:
+# 	output, _ = classifyImage(model, airplane)
+# 	for p, l in enumerate(output):
+# 		print(l, p)
+# 	print()
+# 	time.sleep(1)
+# exit()
+
+
+
 while(True):
-	time.sleep(0.1)
+	# time.sleep(0.5)
 	# Capture frame-by-frame
 	ret, frame = cap.read()
 
 	gray = cv2.cvtColor(frame, cv2.COLOR_BGR2GRAY)
 	blur = cv2.GaussianBlur(gray, (5, 5), 0)
-	_, binary = cv2.threshold(gray, 100, 255, cv2.THRESH_BINARY_INV)
+	_, binary = cv2.threshold(gray, 150, 255, cv2.THRESH_BINARY_INV)
 
 	### Find all squares in the image
 	contours, _ = cv2.findContours(binary, cv2.RETR_EXTERNAL, cv2.CHAIN_APPROX_SIMPLE)
@@ -113,6 +129,10 @@ while(True):
 		cv2.rectangle(frame,(x,y),(x+w,y+h),(0,255,0),2)
 
 	if len(squaresFound) == 0:
+		cv2.imshow("frame",frame)
+		# writer.write(frame)
+		if cv2.waitKey(1) & 0xFF == ord('q'):
+			break
 		continue
 
 	# Just grab the last square for now
@@ -146,6 +166,16 @@ while(True):
 	frame[y0:y1, x0:x1, 0] = im
 	frame[y0:y1, x0:x1, 1] = im
 	frame[y0:y1, x0:x1, 2] = im
+
+
+	# Visualize activations
+	BAR_WIDTH = 22
+	for iLayer, activations in enumerate(layerOutputs): 
+		for iA, a in enumerate(activations):
+			x = WIDTH - BAR_WIDTH * (iA+2)
+			y = HEIGHT - 10 - iLayer * BAR_WIDTH
+			g = int(10 * a)
+			cv2.rectangle(frame, (x, y), (x+BAR_WIDTH-2, y-BAR_WIDTH-2), (0, g, 0), -1)
 
 	cv2.imshow("frame",frame)
 	# writer.write(frame)
