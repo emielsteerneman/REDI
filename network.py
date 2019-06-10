@@ -14,7 +14,7 @@ class ConvNet(nn.Module):
 		for iConvLayer in range(nConvLayers):
 			in_channels = 1 if iConvLayer == 0 else nchannels
 			layer = nn.Sequential(
-				nn.Conv2d(in_channels=in_channels, out_channels=nchannels, kernel_size=5, stride=1, padding=2),
+				nn.Conv2d(in_channels=in_channels, out_channels=nchannels, kernel_size=3, stride=1, padding=1),
 				nn.ReLU(),
 				nn.BatchNorm2d(nchannels),
 				nn.MaxPool2d(kernel_size=2, stride=2))
@@ -26,14 +26,14 @@ class ConvNet(nn.Module):
 		self.convLayers = nn.ModuleList(self.convLayers)
 
 		### ADAPTIVE ###
-		self.adaptive = nn.AdaptiveAvgPool2d((8, 8))
-		print("Adaptive -> %dx%dx%d" % (self.convLayers[-1][0].out_channels, 8, 8), end="")
+		self.adaptive = nn.AdaptiveMaxPool2d((4, 4))
+		print("Adaptive -> %dx%dx%d" % (self.convLayers[-1][0].out_channels, 4, 4), end="")
 
 		### FULLY CONNECTED ###
 		self.drop_out = nn.Dropout()
 		print("|dropout|", end="")
 
-		self.fc = nn.Linear(in_features=nchannels*8*8, out_features=nClasses)
+		self.fc = nn.Linear(in_features=nchannels*4*4, out_features=nClasses)
 		print("1x%d -> 1x%d" % (self.fc.in_features, self.fc.out_features))
 
 	def forward(self, x):
