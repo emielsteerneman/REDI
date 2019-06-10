@@ -50,6 +50,8 @@ def hook_fn(iLayer, module, input, output):
 	activations = output.data[0].numpy().copy()
 	# Get average of activations
 	activations = activations.max(axis=(1, 2))
+	activations -= np.min(activations)
+	activations /= np.max(activations)
 	layerOutputs[iLayer] = activations
 	print(iLayer, "triggered", activations)
 
@@ -109,7 +111,7 @@ while(True):
 
 	gray = cv2.cvtColor(frame, cv2.COLOR_BGR2GRAY)
 	blur = cv2.GaussianBlur(gray, (5, 5), 0)
-	_, binary = cv2.threshold(gray, 150, 255, cv2.THRESH_BINARY_INV)
+	_, binary = cv2.threshold(gray, 100, 255, cv2.THRESH_BINARY_INV)
 
 	### Find all squares in the image
 	contours, _ = cv2.findContours(binary, cv2.RETR_EXTERNAL, cv2.CHAIN_APPROX_SIMPLE)
@@ -128,6 +130,9 @@ while(True):
 		squaresFound.append([x1, y1, x2, y2, x, y, h, w])
 		cv2.rectangle(frame,(x,y),(x+w,y+h),(0,255,0),2)
 
+	# cv2.imshow("binary", binary)
+
+	### Be square or be gone
 	if len(squaresFound) == 0:
 		cv2.imshow("frame",frame)
 		# writer.write(frame)
@@ -174,7 +179,7 @@ while(True):
 		for iA, a in enumerate(activations):
 			x = WIDTH - BAR_WIDTH * (iA+2)
 			y = HEIGHT - 10 - iLayer * BAR_WIDTH
-			g = int(10 * a)
+			g = int(255 * a**3)
 			cv2.rectangle(frame, (x, y), (x+BAR_WIDTH-2, y-BAR_WIDTH-2), (0, g, 0), -1)
 
 	cv2.imshow("frame",frame)

@@ -16,6 +16,7 @@ class ConvNet(nn.Module):
 			layer = nn.Sequential(
 				nn.Conv2d(in_channels=in_channels, out_channels=nchannels, kernel_size=5, stride=1, padding=2),
 				nn.ReLU(),
+				nn.BatchNorm2d(nchannels),
 				nn.MaxPool2d(kernel_size=2, stride=2))
 			self.convLayers.append(layer)
 			print("%dx%dx%d -> " % (layer[0].in_channels, imageSize, imageSize), end="")
@@ -25,7 +26,7 @@ class ConvNet(nn.Module):
 		self.convLayers = nn.ModuleList(self.convLayers)
 
 		### ADAPTIVE ###
-		self.adaptive = torch.nn.AdaptiveAvgPool2d((8, 8))
+		self.adaptive = nn.AdaptiveAvgPool2d((8, 8))
 		print("Adaptive -> %dx%dx%d" % (self.convLayers[-1][0].out_channels, 8, 8), end="")
 
 		### FULLY CONNECTED ###

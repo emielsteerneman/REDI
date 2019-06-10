@@ -39,7 +39,7 @@ data, iClasses, classToLabel = None, None, None
 
 print("Loading and preprocessing images..")
 classes = ["airplane", "radio", "parachute", "screwdriver", "cat", "pizza", "zebra", "crab"]
-data, iClasses, classToLabel = dataloader.loadAndPrepAllImages(NCLASSES, NFILES, IMAGE_SIZE, classes=classes)
+data, iClasses, classToLabel = dataloader.loadAndPrepAllImages(nFiles=NFILES, imsize=IMAGE_SIZE, classes=classes)
 
 print("Converting data to Tensors and moving data to device.. ")
 ### Split data into test and train ###
@@ -116,9 +116,14 @@ for i in range(0, EPOCHS):
 	### Store current model
 	torch.save(model.state_dict(), modelDir + "/%d_%0.2f.model" % (i, acc))
 
+	### Break on good performance
+	if 0.99 < acc:
+		break
+
 ### Calculate accuracy
 print("\nTesting CNN on cpu..")
 model = model.to("cpu")
+model.eval()
 correct = 0
 for nB in range(0, NTEST, batchSize):
 	y = model(dataTest[nB:nB+batchSize])
@@ -128,7 +133,7 @@ print("Accuracy : %0.2f" % (correct / NTEST))
 
 
 
-data, iClasses, classToLabel = dataloader.loadAndPrepAllImages(NCLASSES, NFILES, IMAGE_SIZE)
+data, iClasses, classToLabel = dataloader.loadAndPrepAllImages(nFiles=NFILES, imsize=IMAGE_SIZE, classes=classes)
 data = torch.FloatTensor(data)
 
 correct = [0] * NCLASSES
