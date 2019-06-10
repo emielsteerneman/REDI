@@ -22,13 +22,13 @@ torch.cuda.empty_cache()
 #####################################################################################
 #####################################################################################
 
-NCLASSES = 8
+NCLASSES = -1 # Might be modified below
 NFILES = 80
 IMAGE_SIZE = 64
 EPOCHS = 100
 NBATCHES = 1# NCLASSES * NFILES * 0.5
-NLAYERS = 3
-NCHANNELS = 10
+NLAYERS = 2
+NCHANNELS = 8
 LEARNING_RATE=0.01
 
 # Select device
@@ -38,7 +38,11 @@ device = torch.device("cuda:0" if torch.cuda.is_available() else "cpu")
 data, iClasses, classToLabel = None, None, None
 
 print("Loading and preprocessing images..")
-classes = ["airplane", "radio", "parachute", "screwdriver", "cat", "pizza", "zebra", "crab"]
+classes = ["airplane", "parachute", "screwdriver", "cat", "pizza", "zebra"]
+# classes = ["t-shirt", "flower with stem", "comb", "snake", "sun", "leaf", "elephant", "eyeglasses", "umbrella", "butterfly"]
+NCLASSES = len(classes)
+
+
 data, iClasses, classToLabel = dataloader.loadAndPrepAllImages(nFiles=NFILES, imsize=IMAGE_SIZE, classes=classes)
 
 print("Converting data to Tensors and moving data to device.. ")
@@ -86,39 +90,42 @@ print("")
 ################
 ### Training ###
 ################
-for i in range(0, EPOCHS):
-	
-	### Train batch
-	for nB in range(0, NTRAIN, batchSize):
-		print("\r  Batching %d/%d" % (nB+batchSize, NTRAIN), end=" "*20, flush=True)
-		# Run the forward pass
-		y = model(dataTrain[nB:nB+batchSize])
-		loss = criterion(y, labelsTrain[nB:nB+batchSize])
-		# Backprop and perform Adam optimisation
-		optimizer.zero_grad()
-		loss.backward()
-		optimizer.step()
+try:
+	for i in range(0, EPOCHS):
+		
+		### Train batch
+		for nB in range(0, NTRAIN, batchSize):
+			print("\r  Batching %d/%d" % (nB+batchSize, NTRAIN), end=" "*20, flush=True)
+			# Run the forward pass
+			y = model(dataTrain[nB:nB+batchSize])
+			loss = criterion(y, labelsTrain[nB:nB+batchSize])
+			# Backprop and perform Adam optimisation
+			optimizer.zero_grad()
+			loss.backward()
+			optimizer.step()
 
-	### Calculate accuracy
-	acc, loss = 0, 0
-	for nB in range(0, NTRAIN, batchSize):
-		print("\r  Accuracy %d/%d" % (nB+batchSize, NTRAIN), end=" "*20, flush=True)
-		# Forward pass
-		y = model(dataTrain[nB:nB+batchSize])
-		loss += criterion(y, labelsTrain[nB:nB+batchSize])
-		_, predicted = torch.max(y.data, 1)
-		correct = (predicted == labelsTrain[nB:nB+batchSize]).sum().item()
-		acc += correct / batchSize
-	acc = acc / NBATCHES
+		### Calculate accuracy
+		acc, loss = 0, 0
+		for nB in range(0, NTRAIN, batchSize):
+			print("\r  Accuracy %d/%d" % (nB+batchSize, NTRAIN), end=" "*20, flush=True)
+			# Forward pass
+			y = model(dataTrain[nB:nB+batchSize])
+			loss += criterion(y, labelsTrain[nB:nB+batchSize])
+			_, predicted = torch.max(y.data, 1)
+			correct = (predicted == labelsTrain[nB:nB+batchSize]).sum().item()
+			acc += correct / batchSize
+		acc = acc / NBATCHES
 
-	print("\r  epoch=%d" % i, "loss=%4.2f" % loss, "accuracy=%0.2f" % acc)
-	
-	### Store current model
-	torch.save(model.state_dict(), modelDir + "/%d_%0.2f.model" % (i, acc))
+		print("\r  epoch=%d" % i, "loss=%4.4f" % loss, "accuracy=%0.4f" % acc)
+		
+		### Store current model
+		torch.save(model.state_dict(), modelDir + "/%d_%0.2f.model" % (i, acc))
 
-	### Break on good performance
-	if 0.99 < acc:
-		break
+		### Break on good performance
+		if loss < 0.001 and 0.999 < acc:
+			break
+except KeyboardInterrupt:
+	print("\n\nTraining stopped prematurely")
 
 ### Calculate accuracy
 print("\nTesting CNN on cpu..")
