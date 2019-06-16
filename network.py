@@ -16,7 +16,7 @@ class ConvNet(nn.Module):
 			layer = nn.Sequential(
 				nn.Conv2d(in_channels=in_channels, out_channels=nchannels, kernel_size=3, stride=1, padding=1),
 				nn.ReLU(),
-				nn.BatchNorm2d(nchannels),
+				# nn.BatchNorm2d(nchannels),
 				nn.MaxPool2d(kernel_size=2, stride=2))
 			self.convLayers.append(layer)
 			print("%dx%dx%d -> " % (layer[0].in_channels, imageSize, imageSize), end="")
