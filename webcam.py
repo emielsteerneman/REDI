@@ -9,6 +9,10 @@ import numpy as np
 import time
 import sys
 from torchsummary import summary
+import operator
+
+import render
+
 # Numpy pretty print
 np.set_printoptions(precision=2)
 
@@ -24,7 +28,7 @@ else:
 
 # Set model to evaluation mode (disables dropout layers)
 model.eval()
-summary(model, (1, IMAGE_SIZE, IMAGE_SIZE), 1)
+summary(model, (1, IMAGE_SIZE, IMAGE_SIZE), 1, "cpu")
 
 ### Load class labels
 predictions = {}
@@ -41,31 +45,66 @@ cap.set(cv2.CAP_PROP_FPS, 30)
 WIDTH  = int(cap.get(cv2.CAP_PROP_FRAME_WIDTH))
 HEIGHT = int(cap.get(cv2.CAP_PROP_FRAME_HEIGHT))
 
-# writer = cv2.VideoWriter("/home/emiel/Desktop/REDI_.mp4", cv2.VideoWriter_fourcc(*'XVID'), 30, (WIDTH, HEIGHT))
+# writer = cv2.VideoWriter("/home/emiel/Desktop/REDI_.mp4", cv2.VideoWriter_fourcc(*'XVID'), 30, (1800, 800))
 
-BINARY_THRESHOLD = 130
+BINARY_THRESHOLD = 110
 NP_THRESHOLD = 0.3
+
+
+
+
+
+
+
+
+from scipy import signal
+
+def gkern(kernlen=21, std1=3, std2=3):
+    """Returns a 2D Gaussian kernel array."""
+    gkern1d1 = signal.gaussian(kernlen, std=std1).reshape(kernlen, 1)
+    gkern1d2 = signal.gaussian(kernlen, std=std2).reshape(kernlen, 1)
+    gkern2d = np.outer(gkern1d1, gkern1d2)
+    return gkern2d
+
+def generateGauss(xOffset=0, yOffset=0, std1=3, std2=3):
+	W, H = 640, 480
+	SIZE = 100
+	kern = gkern(SIZE, std1, std2)
+	gauss = np.ones((H, W, 3), dtype=np.uint8) * 255
+	x1, x2 = W//2 - SIZE//2 + xOffset, W//2 + SIZE//2 + xOffset
+	y1, y2 = H//2 - SIZE//2 + yOffset, H//2 + SIZE//2 + yOffset
+	gauss[y1:y2, x1:x2, 0] = 255 - kern * 255
+	gauss[y1:y2, x1:x2, 1] = 255 - kern * 255
+	gauss[y1:y2, x1:x2, 2] = 255 - kern * 255
+	cv2.rectangle(gauss, (120, 40), (520, 440), (0, 0, 0), 5)
+	return gauss
+
+def generateChecker(step):
+	W, H = 640, 480
+	checker = np.ones((H, W, 3), dtype=np.uint8) * 255
+	dx, dy = step % 4, (step%16) // 4
+	x, y = 157 + 82 * dx, 77 + 82 * dy
+	
+	cv2.rectangle(checker, (120, 40), (520, 440), (0, 0, 0), 5)
+	cv2.rectangle(checker, (x+10, y+10), (x+75, y+75), (0, 0, 0), -1)
+	return checker	
+
 
 
 
 ##########################
 ### ADD HOOKS TO MODEL ###
-convActivations  = np.zeros((len(model.convLayers), NCHANNELS))
-convActivationsT = np.zeros((len(model.convLayers), NCHANNELS))
+convRenders = [None] * (NLAYERS+1)
 fullActivations  = np.zeros((1, NCHANNELS * 4 * 4))
 fullActivationsT = np.zeros((1, NCHANNELS * 4 * 4))
-# fullActivations  = np.zeros(NCHANNELS * 4 * 4)
-# fullActivationsT = np.zeros(NCHANNELS * 4 * 4)
 
 def hook_fn(iLayer, module, input, output):
-	# Get data
 	activations = output.data[0].numpy().copy()
-	# Get average of activations
-	activations = activations.max(axis=(1, 2))
-	convActivations[iLayer] = activations.copy()
-	convActivationsT[iLayer] += 0.1 * (convActivations[iLayer] - convActivationsT[iLayer])
+	img = render.renderConvLayer(activations, PADDING=10)
+	convRenders[iLayer] = img
+	# cv2.imshow("layer %d" % iLayer, img)
 
-def dropout_hook_fn(module, input, output):
+def fc_hook_fn(module, input, output):
 	fullActivations = input[0].data[0].numpy()
 	fullActivationsT[0] += 0.1 * (fullActivations - fullActivationsT[0])
 
@@ -73,16 +112,11 @@ print("Adding hooks to model..")
 for iLayer, layer in enumerate(model.convLayers):
 	# Ugly hack to create a closure for the variable iLayer. https://stackoverflow.com/a/2295368/2165613
 	layer.register_forward_hook(	  (lambda iL : lambda module, input, output : hook_fn(iL, module, input, output))(iLayer)		)
-model.drop_out.register_forward_hook(dropout_hook_fn)
+model.adaptive.register_forward_hook(lambda module, input, output : hook_fn(NLAYERS, module, input, output))
+
+model.fc.register_forward_hook(fc_hook_fn)
 ### HOOKS ADDED TO MODEL ### 
 ############################
-
-###################################
-### EVERYTHING BARCHART RELATED ###
-COLOURS = [(255, 127, 0), (127, 0, 255), (0, 255, 127), (127, 255, 0), (255, 0, 127), (0, 127, 255)]
-def getColour(i):
-	return COLOURS[ i % len(COLOURS) ]
-
 
 print("Loading single image..")
 airplane = dataloader.loadAndPrepImage("sketches_png/apple/322.png", imsize=IMAGE_SIZE).reshape(IMAGE_SIZE, IMAGE_SIZE)
@@ -117,22 +151,15 @@ def classifyImage(model, image):
 
 	return output, im
 
-
-
-# while True:
-# 	output, _ = classifyImage(model, airplane)
-# 	for p, l in enumerate(output):
-# 		print(l, p)
-# 	print()
-# 	time.sleep(1)
-# exit()
-
-
+iFrame = 0
 
 while(True):
-	# time.sleep(0.5)
-	# Capture frame-by-frame
+	iFrame += 1
 	ret, frame = cap.read()
+	
+	# xOffset, yOffset, std1, std2 = int(np.sin(iFrame/37) * 150), int(np.cos(iFrame/13) * 150), int(np.sin(iFrame/60)*40), int(np.cos(iFrame/93)*40)
+	# frame = generateGauss(xOffset, yOffset, std1, std2)
+	# frame = generateChecker(iFrame // 30)
 
 	gray = cv2.cvtColor(frame, cv2.COLOR_BGR2GRAY)
 	blur = cv2.GaussianBlur(gray, (5, 5), 0)
@@ -157,22 +184,36 @@ while(True):
 
 	# cv2.imshow("binary", binary)
 
-	### Be square or be gone
+	### Be square or be gone. Stop if there are no squares found
 	if len(squaresFound) == 0:
-		cv2.imshow("frame",frame)
-		# writer.write(frame)
+		cv2.imshow("binary", binary)
+		cv2.imshow("frame", frame)
 		if cv2.waitKey(1) & 0xFF == ord('q'):
 			break
 		continue
+	### If a square is found, try closing the window "frame" and "binary" that might have been opened above
+	try:
+		cv2.destroyWindow("binary")
+		cv2.destroyWindow("frame")
+	except:
+		pass
 
 	# Just grab the last square for now
 	x1, y1, x2, y2, x, y, h, w = squaresFound[-1]
-	cv2.rectangle(frame,(x,y),(x+w,y+h),(255, 128, 0),2)		
+	cv2.rectangle(frame, (x,y), (x+w,y+h), (255, 128, 0), 1)		
+
+	xStep, yStep = (x2-x1)//4, (y2-y1)//4
+	for dx in range(4):
+		for dy in range(4):
+			dx1, dy1 = x1 + dx * xStep, y1 + dy * yStep
+			cv2.rectangle(frame, (dx1, dy1), (dx1+xStep, dy1+yStep), (0, 0, 0), 1)
+
 	drawing = gray[y1:y2, x1:x2]
 
 	# Classify image
 	output, im = classifyImage(model, drawing)
 
+	### Draw classification
 	for i, (p, l) in enumerate(output):
 		predictions[l] -= (predictions[l] - p) * 0.1	
 		pX, pY = 40, 40+20*i
@@ -197,55 +238,97 @@ while(True):
 	frame[y0:y1, x0:x1, 1] = im
 	frame[y0:y1, x0:x1, 2] = im
 
-	###########################
-	### Visualize bar chart ###
-	BAR_WIDTH, PADDING = 20, 2
-	LAYER_WIDTH = NCHANNELS * (BAR_WIDTH+PADDING) - PADDING + BAR_WIDTH
-	GRAPH_WIDTH = BAR_WIDTH + NLAYERS * LAYER_WIDTH
-	
-	chart = np.ones((400, GRAPH_WIDTH, 3), dtype=np.uint8) * 20
-	for iLayer, activations in enumerate(convActivationsT):
-		x = BAR_WIDTH + iLayer * LAYER_WIDTH
-		for iA, a in enumerate(activations):
-			y = int(a*10)
-			cv2.rectangle(chart, (x, 400), (x + BAR_WIDTH, 400-y), getColour(iLayer), -1)
-			x += BAR_WIDTH + PADDING
-	cv2.imshow("bar chart", chart)
-	###########################
-
-	###########################
-	### Visualize bar chart ###
-	BAR_WIDTH, PADDING = 10, 2
-	LAYER_WIDTH = 16 * (BAR_WIDTH+PADDING) - PADDING + BAR_WIDTH
-	GRAPH_WIDTH = BAR_WIDTH + NCHANNELS * LAYER_WIDTH
-	
-	chart = np.ones((800, GRAPH_WIDTH, 3), dtype=np.uint8) * 20
-	for iChannel in range(0, 8):
-		pixels = fullActivationsT[0][iChannel*16 : (iChannel+1) * 16]
-		x = BAR_WIDTH + iChannel * LAYER_WIDTH
-		for iPixel, pixel in enumerate(pixels):
-			y = int(pixel * 100)
-			cv2.rectangle(chart, (x, 400), (x + BAR_WIDTH, 400-y), getColour(iChannel), -1)
-			x += BAR_WIDTH + PADDING
-	cv2.imshow("bar chart 2", chart)
-			# print("\t", iPixel, pixel)
-		# 	x = BAR_WIDTH + iChannel * LAYER_WIDTH + iPixel
-		# 	for iA, a in enumerate(activations):
-		# 		y = int(a*10)
-		# 		cv2.rectangle(chart, (x, 400), (x + BAR_WIDTH, 400-y), getColour(iLayer), -1)
-		# 		x += BAR_WIDTH + PADDING
-		# cv2.imshow("bar chart", chart)
-	###########################
 
 
-	cv2.imshow("frame",frame)
+	########################################
+	# vvvvvvvvvv VISUALISATIONS vvvvvvvvvv #
+	########################################
 
-	# writer.write(frame)
+	###########################################################################
+	### Visualize output of last convolutional layer / adaptive layer / input of fully connected layer ###
+	pixels = fullActivationsT[0].reshape((NCHANNELS, 4*4))
+	barChartFc = render.render2dBarCharts(pixels, BAR_WIDTH=3, PADDING=2, FACTOR=20, GRAPH_HEIGHT=200)
+	barChartFc = np.rot90(barChartFc, 3)
+	# cv2.imshow("Input of fully connected layer", barChartFc)
+	###########################################################################
+
+	activeClass = max(predictions.items(), key=operator.itemgetter(1))[0]
+	iActiveClass = CLASSES.index(activeClass)
+
+	#########################################
+	### Visualize weights of active class ###
+	classWeights = model.fc.weight[iActiveClass].data.numpy().reshape((NCHANNELS, 4*4))
+	barChartWeights = render.render2dBarCharts(classWeights, BAR_WIDTH=3, PADDING=2, FACTOR=100, GRAPH_HEIGHT=100, COLOUR=(255, 255, 255))
+	barChartWeights = np.rot90(barChartWeights, 3)
+	# cv2.imshow("Weights of active class", barchartWeights)
+	#########################################
+
+	#####################################################
+	### Visualize product of inputs and class weights ###
+	classWeights = model.fc.weight[iActiveClass].data.numpy()
+	inputsAndWeights = (fullActivationsT[0] * classWeights).reshape((NCHANNELS, 4*4))
+	barChartFcWeights = render.render2dBarCharts(inputsAndWeights, BAR_WIDTH=3, PADDING=2, FACTOR=200, GRAPH_HEIGHT=200)
+	barChartFcWeights = np.rot90(barChartFcWeights, 3)
+	# cv2.imshow("Inputs times weights", barChartFcWeights)
+	#####################################################
+
+
+
+
+
+
+
+
+
+
+
+	FINAL_WIDTH = 1800
+	FINAL_HEIGHT = 800
+	final = np.ones((FINAL_HEIGHT, FINAL_WIDTH, 3), dtype=np.uint8) * 20
+
+	## Add convolutional renders
+	for iConvRender, convRender in enumerate(convRenders):
+		RENDER_HEIGHT, RENDER_WIDTH, _ = convRender.shape
+		x = 10 + iConvRender * (RENDER_WIDTH + 50)
+		y = FINAL_HEIGHT//2 - RENDER_HEIGHT//2
+		final[y:y+RENDER_HEIGHT, x:x+RENDER_WIDTH, :] = convRender
+		txt = "Layer %d" % iConvRender
+		cv2.putText(final, txt, (x+10, 30), cv2.FONT_HERSHEY_SIMPLEX, 0.5, (255, 255, 255), lineType=cv2.LINE_AA)
+
+	## Add input of fully connected layer
+	x = 400
+	y = FINAL_HEIGHT//2 - barChartFc.shape[0] // 2
+	final[y:y+barChartFc.shape[0], x:x+barChartFc.shape[1], :] = barChartFc
+	txt = "Fully Connected"
+	cv2.putText(final, txt, (x+30, 30), cv2.FONT_HERSHEY_SIMPLEX, 0.5, (255, 255, 255), lineType=cv2.LINE_AA)
+
+	x = 600
+	y = FINAL_HEIGHT//2 - barChartFcWeights.shape[0] // 2
+	final[y:y+barChartWeights.shape[0], x:x+barChartWeights.shape[1], :] = barChartWeights
+	txt = "Weights '%s'" % activeClass
+	cv2.putText(final, txt, (x+20, 30), cv2.FONT_HERSHEY_SIMPLEX, 0.5, (255, 255, 255), lineType=cv2.LINE_AA)
+
+	x = 700
+	y = FINAL_HEIGHT//2 - barChartFcWeights.shape[0] // 2
+	final[y:y+barChartFcWeights.shape[0], x:x+barChartFcWeights.shape[1], :] = barChartFcWeights
+	txt = "FC * Weights"
+	cv2.putText(final, txt, (x+80, 30), cv2.FONT_HERSHEY_SIMPLEX, 0.5, (255, 255, 255), lineType=cv2.LINE_AA)	
+
+	final[-HEIGHT:, -WIDTH:, :] = frame
+
+	cv2.imshow("final", final)
+	#########################################
+
+
+
+	# cv2.imshow("frame",frame)
+	# writer.write(final)
 
 	if cv2.waitKey(1) & 0xFF == ord('q'):
 		break
 
 # When everything done, release the capture
+# writer.release()
 cap.release()
 cv2.destroyAllWindows()
 
