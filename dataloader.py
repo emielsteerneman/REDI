@@ -72,7 +72,18 @@ def loadAndPrepAllImages(nClasses = None, nFiles = 80, imsize=64, rootfolder="./
 	print("\n[dataloader] Images loaded\n")
 	return data, iClasses, classToLabel
 
-def loadModelFromDir(modelDir):
+def getAllModelDirs(folder="./"):
+	models = list(filter(lambda f : f.startswith("model_"), os.listdir(folder)))
+	models.sort(reverse=True)
+	return models
+
+def getAllModelWeights(folder="./"):
+	weights = os.listdir(folder)
+	weights = list(filter(lambda x : x.endswith(".model"), weights))
+	weights.sort(key=lambda x : int(x.split("_")[0]), reverse=True)
+	return weights
+
+def loadModelFromDir(modelDir, weightsFile=None):
 	network = importlib.import_module(".network", package=modelDir)
 
 	### Retrieve information from directory name (model_190530-011512_128_250_80)
@@ -81,10 +92,8 @@ def loadModelFromDir(modelDir):
 	### Load classes
 	CLASSES = open(modelDir + "/classes.txt").read().split(" ")
 	### Get latest weights
-	models = os.listdir(modelDir)
-	models = list(filter(lambda x : x.endswith(".model"), models))
-	models.sort(key=lambda x : int(x.split("_")[0]), reverse=True)
-	weightsFile = models[0]
+	if weightsFile is None:
+		weightsFile = getAllModelWeights(modelDir)[0]
 	print("[dataloader] Loading weights from " + modelDir + "/" + weightsFile)
 	modelWeights = torch.load(modelDir + "/" + weightsFile)
 	### Create model and restore weights
@@ -93,6 +102,4 @@ def loadModelFromDir(modelDir):
 	return model, date, NCLASSES, NFILES, NBATCHES, NLAYERS, NCHANNELS, IMAGE_SIZE, CLASSES
 
 def loadLatestModel(folder="./"):
-	models = list(filter(lambda f : f.startswith("model_"), os.listdir(folder)))
-	models.sort(reverse=True)	
-	return loadModelFromDir(models[0])
+	return loadModelFromDir(getAllModelDirs(folder)[0])
