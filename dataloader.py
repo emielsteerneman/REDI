@@ -79,7 +79,7 @@ def getAllModelDirs(folder="./"):
 
 def getAllModelWeights(folder="./"):
 	weights = os.listdir(folder)
-	weights = list(filter(lambda x : x.endswith(".model"), weights))
+	weights = list(filter(lambda x : x[0].isdigit() and x.endswith(".model"), weights))
 	weights.sort(key=lambda x : int(x.split("_")[0]), reverse=True)
 	return weights
 
@@ -99,7 +99,19 @@ def loadModelFromDir(modelDir, weightsFile=None):
 	### Create model and restore weights
 	model = network.ConvNet(NCLASSES, imageSize=IMAGE_SIZE, nConvLayers=NLAYERS, nchannels=NCHANNELS)
 	model.load_state_dict(modelWeights)
-	return model, date, NCLASSES, NFILES, NBATCHES, NLAYERS, NCHANNELS, IMAGE_SIZE, CLASSES
+	
+	INDICES_TRAIN, INDICES_TEST = loadIndicesFromDir(modelDir)
+
+	return model, date, NCLASSES, NFILES, NBATCHES, NLAYERS, NCHANNELS, IMAGE_SIZE, CLASSES, modelDir, INDICES_TRAIN, INDICES_TEST
+
+def loadIndicesFromDir(modelDir):
+	f = open(modelDir + "/indices.txt", "r")
+	indicesStr = f.read()
+	f.close()
+	indicesStr = indicesStr.split("\n")
+	indicesTrain = [int(x) for x in indicesStr[0].split(" ")[1:]]
+	indicesTest  = [int(x) for x in indicesStr[1].split(" ")[1:]]
+	return [indicesTrain, indicesTest]
 
 def loadLatestModel(folder="./"):
 	return loadModelFromDir(getAllModelDirs(folder)[0])
