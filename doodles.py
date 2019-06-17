@@ -75,6 +75,12 @@ f = open(modelDir + "/classes.txt", "w")
 f.write(" ".join(classes))
 f.close()
 
+f = open(modelDir + "/indices.txt", "w")
+f.write("train " + " ".join(map(str, indicesTrain)) + "\n")
+f.write("test " + " ".join(map(str, indicesTest)))
+f.close()
+
+
 ### Profile storage ###
 dataInGb   = sum([d.nbytes for d in data]) / 1e9
 trainInGb  = sys.getsizeof(dataTrain.storage()) / (1e9)
