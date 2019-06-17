@@ -10,21 +10,30 @@ import time
 import sys
 from torchsummary import summary
 import operator
-
+import argparse
 import render
 
 # Numpy pretty print
 np.set_printoptions(precision=2)
 
 ### Load model
-modelDir = None
-if modelDir == None:
-	if len(sys.argv) == 1:
-		model, date, NCLASSES, NFILES, NBATCHES, NLAYERS, NCHANNELS, IMAGE_SIZE, CLASSES = dataloader.loadLatestModel()
-	else:
-		model, date, NCLASSES, NFILES, NBATCHES, NLAYERS, NCHANNELS, IMAGE_SIZE, CLASSES = dataloader.loadModelFromDir(sys.argv[1])
+
+parser = argparse.ArgumentParser()
+parser.add_argument('-d' , metavar='DIRECTORY', required=False, help='Directory to load the model from')
+parser.add_argument('-m', metavar='MODEL_NAME', required=False, help='Name of model to be loaded')
+args = parser.parse_args()
+
+modelDir = args.d
+modelName = args.m
+print(modelDir,modelName)
+if modelDir == None and modelName == None:
+	print("loadLatestModel()")
+	model, date, NCLASSES, NFILES, NBATCHES, NLAYERS, NCHANNELS, IMAGE_SIZE, CLASSES, MODELDIR = dataloader.loadLatestModel()
 else:
-	model, date, NCLASSES, NFILES, NBATCHES, NLAYERS, NCHANNELS, IMAGE_SIZE, CLASSES = dataloader.loadModelFromDir(modelDir)
+	modelDir = modelDir if modelDir is not None else dataloader.getAllModelDirs("./")[0]
+	print("loadModelFromDir(" + str(modelDir) + ", " + str(modelName) + ")")
+	model, date, NCLASSES, NFILES, NBATCHES, NLAYERS, NCHANNELS, IMAGE_SIZE, CLASSES, MODELDIR = dataloader.loadModelFromDir(modelDir, modelName)
+
 
 # Set model to evaluation mode (disables dropout layers)
 model.eval()
@@ -36,7 +45,7 @@ for c in CLASSES:
 	predictions[c] = 0.0
 
 print("Opening webcam...")
-cap = cv2.VideoCapture(0)
+cap = cv2.VideoCapture(1)
 
 # cap.set(cv2.CAP_PROP_FRAME_WIDTH, 1920)
 # cap.set(cv2.CAP_PROP_FRAME_HEIGHT, 1080)
@@ -47,7 +56,7 @@ HEIGHT = int(cap.get(cv2.CAP_PROP_FRAME_HEIGHT))
 
 # writer = cv2.VideoWriter("/home/emiel/Desktop/REDI_.mp4", cv2.VideoWriter_fourcc(*'XVID'), 30, (1800, 800))
 
-BINARY_THRESHOLD = 110
+BINARY_THRESHOLD = 120
 NP_THRESHOLD = 0.3
 
 
@@ -186,8 +195,8 @@ while(True):
 
 	### Be square or be gone. Stop if there are no squares found
 	if len(squaresFound) == 0:
-		cv2.imshow("binary", binary)
 		cv2.imshow("frame", frame)
+		cv2.imshow("binary", binary)
 		if cv2.waitKey(1) & 0xFF == ord('q'):
 			break
 		continue
