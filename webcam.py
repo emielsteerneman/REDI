@@ -19,8 +19,9 @@ np.set_printoptions(precision=2)
 ### Load model
 
 parser = argparse.ArgumentParser()
-parser.add_argument('-d' , metavar='DIRECTORY', required=False, help='Directory to load the model from')
+parser.add_argument('-d', metavar='DIRECTORY', required=False, help='Directory to load the model from')
 parser.add_argument('-m', metavar='MODEL_NAME', required=False, help='Name of model to be loaded')
+parser.add_argument('-w', metavar='MODEL_NAME', required=False, type=int, default=0, help='Name of model to be loaded')
 args = parser.parse_args()
 
 modelDir = args.d
@@ -28,11 +29,11 @@ modelName = args.m
 print(modelDir,modelName)
 if modelDir == None and modelName == None:
 	print("loadLatestModel()")
-	model, date, NCLASSES, NFILES, NBATCHES, NLAYERS, NCHANNELS, IMAGE_SIZE, CLASSES, MODELDIR = dataloader.loadLatestModel()
+	model, date, NCLASSES, NFILES, NBATCHES, NLAYERS, NCHANNELS, IMAGE_SIZE, CLASSES, MODELDIR, INDICES_TRAIN, INDICES_TEST = dataloader.loadLatestModel()
 else:
 	modelDir = modelDir if modelDir is not None else dataloader.getAllModelDirs("./")[0]
 	print("loadModelFromDir(" + str(modelDir) + ", " + str(modelName) + ")")
-	model, date, NCLASSES, NFILES, NBATCHES, NLAYERS, NCHANNELS, IMAGE_SIZE, CLASSES, MODELDIR = dataloader.loadModelFromDir(modelDir, modelName)
+	model, date, NCLASSES, NFILES, NBATCHES, NLAYERS, NCHANNELS, IMAGE_SIZE, CLASSES, MODELDIR, INDICES_TRAIN, INDICES_TEST = dataloader.loadModelFromDir(modelDir, modelName)
 
 
 # Set model to evaluation mode (disables dropout layers)
@@ -45,7 +46,7 @@ for c in CLASSES:
 	predictions[c] = 0.0
 
 print("Opening webcam...")
-cap = cv2.VideoCapture(1)
+cap = cv2.VideoCapture(args.w)
 
 # cap.set(cv2.CAP_PROP_FRAME_WIDTH, 1920)
 # cap.set(cv2.CAP_PROP_FRAME_HEIGHT, 1080)
@@ -56,7 +57,7 @@ HEIGHT = int(cap.get(cv2.CAP_PROP_FRAME_HEIGHT))
 
 # writer = cv2.VideoWriter("/home/emiel/Desktop/REDI_.mp4", cv2.VideoWriter_fourcc(*'XVID'), 30, (1800, 800))
 
-BINARY_THRESHOLD = 120
+BINARY_THRESHOLD = 100
 NP_THRESHOLD = 0.3
 
 
