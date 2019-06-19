@@ -27,9 +27,9 @@ class SaveFeatures():
 
 # Select device
 device = torch.device("cuda:0" if torch.cuda.is_available() else "cpu")
+device = "cpu"
 
-modelDir = "model_190602-122056_128_10_80"
-model, date, IMAGE_SIZE, NCLASSES, NFILES = dataloader.loadModelFromDir(modelDir)
+model, date, NCLASSES, NFILES, NBATCHES, NLAYERS, NCHANNELS, IMAGE_SIZE, CLASSES = dataloader.loadLatestModel()
 
 model.to(device)
 
@@ -39,7 +39,7 @@ for name, param in model.named_parameters():
 	print(name.ljust(20), param.size())
 
 img = dataloader.loadAndPrepImage("sketches_png/radio/13474.png", IMAGE_SIZE)
-imgTensor = torch.FloatTensor(img.reshape(1, 1, IMAGE_SIZE, IMAGE_SIZE)).cuda()
+imgTensor = torch.FloatTensor(img.reshape(1, 1, IMAGE_SIZE, IMAGE_SIZE)).to(device)
 
 # cv2.imshow("img", img.reshape(IMAGE_SIZE, IMAGE_SIZE)*255)
 # cv2.waitKey(0)
@@ -122,19 +122,19 @@ imgTensor = torch.FloatTensor(img.reshape(1, 1, IMAGE_SIZE, IMAGE_SIZE)).cuda()
 ### Visualize feature filter with hook ###
 ##########################################
 for iLayer, layer in enumerate(model.convLayers):
-	if iLayer != 0:
+	if iLayer != 1:
 		continue
 	print("Layer %d" % iLayer)
 	accumulate = np.zeros((IMAGE_SIZE*8, IMAGE_SIZE*8), dtype=np.float32)
 	for iFeature in range(0, 64):
 
 		STEPS = 12
-		INITIAL_SIZE = 128
+		INITIAL_SIZE = 8
 
 		dx, dy = iFeature % 8, iFeature // 8
 		px, py = dx*IMAGE_SIZE, dy*IMAGE_SIZE
 		
-		noise = torch.rand(1, 1, IMAGE_SIZE, IMAGE_SIZE, requires_grad=True, device="cuda")
+		noise = torch.rand(1, 1, INITIAL_SIZE, INITIAL_SIZE, requires_grad=True, device=device)
 		noise.data = noise.data / 10 + 0.45
 		
 		optimizer = torch.optim.Adam([noise], lr=0.01, weight_decay=1e-6)
@@ -144,14 +144,15 @@ for iLayer, layer in enumerate(model.convLayers):
 			size = int(INITIAL_SIZE * 1.22**iStep)
 			print(iStep, "%dx%d" % (size, size))
 
-			# noise = noise.cpu().data.numpy()[0][0]
-			# noise = cv2.resize(noise, (size, size), interpolation=cv2.INTER_CUBIC)
-			# noise = noise.reshape(1, 1, size, size)
-			# noise = torch.FloatTensor(noise).cuda()
-			# noise.requires_grad=True
+			noise = noise.cpu().data.numpy()[0][0]
+			noise = cv2.resize(noise, (size, size), interpolation=cv2.INTER_CUBIC)
+			noise = noise.reshape(1, 1, size, size)
+			noise = torch.FloatTensor(noise).to(device)
+			noise.requires_grad=True
+
 			optimizer = torch.optim.Adam([noise], lr=0.01, weight_decay=1e-6)
 
-			for i in range(0, 50):
+			for i in range(0, 500):
 
 				# if i % IMAGE_SIZE == 0 and 0 < i:
 				# 	print("Resizing", i, i // STEPS, noise.size())
@@ -187,7 +188,7 @@ for iLayer, layer in enumerate(model.convLayers):
 		data[q90 < data] = q90
 		data -= np.min(data)
 		data /= np.max(data)
-		accumulate[py:py+128, px:px+128] = data
+		accumulate[py:py+64, px:px+64] = data
 		
 		cv2.imshow("accumulate %d" % iLayer, accumulate)
 		cv2.waitKey(1)

@@ -85,3 +85,38 @@ def renderConvLayer(values, PADDING=2):
 		render[y1:y2, :, 2] = img
 
 	return render
+
+def renderKernel(weights):
+	if len(weights.shape) == 3 and weights.shape[0] == 1:
+		weights = weights.squeeze(axis=0)
+
+	if len(weights.shape) != 2:
+		print("Incorrect shape", weights.shape)
+		return np.zeros((3, 3))
+	img = cv2.resize(weights, (90, 90), interpolation=cv2.INTER_NEAREST)
+	return img
+
+def renderKernels(model, MIN=None, MAX=None):
+
+	conv1Kernels = model.convLayers[0][0].weight.data.numpy() 
+	conv2Kernels = model.convLayers[1][0].weight.data.numpy()
+	
+	if MIN == None or MAX == None:
+		MIN = min(np.min(conv1Kernels), np.min(conv2Kernels))
+		MAX = max(np.max(conv1Kernels), np.max(conv2Kernels))
+
+	img = np.ones((900, 1030), dtype=np.uint8) * 20
+	for iKernel, kernel in enumerate(conv1Kernels):
+		k = renderKernel(kernel)
+		k = 255 * (k - MIN) / (MAX - MIN)
+		x, y = 20, 20 + iKernel*110
+		img[y:y+90, x:x+90] = k
+
+	for iKernels, kernels in enumerate(conv2Kernels):
+		for iKernel, kernel in enumerate(kernels):
+			k = renderKernel(kernel)
+			k = 255 * (k - MIN) / (MAX - MIN)
+
+			x, y = 150 + iKernel*110, 20 + iKernels*110
+			img[y:y+90, x:x+90] = k
+	return img

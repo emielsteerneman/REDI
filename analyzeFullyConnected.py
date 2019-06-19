@@ -23,12 +23,12 @@ weightFiles.reverse()
 print("Loading all model iterations..")
 models = []
 for file in weightFiles:
-	model, _, _, _, _, _, _, _, _ = dataloader.loadModelFromDir(modelDir, file)
+	model, _, _, _, _, _, _, _, _, _, _, _ = dataloader.loadModelFromDir(modelDir, file)
 	model.eval() # Set model to evaluation mode (disables dropout layers)
 	models.append(model)
 
 # Load other parameters into global variables
-model, date, NCLASSES, NFILES, NBATCHES, NLAYERS, NCHANNELS, IMAGE_SIZE, CLASSES = dataloader.loadModelFromDir(modelDir, weightFiles[0])
+model, date, NCLASSES, NFILES, NBATCHES, NLAYERS, NCHANNELS, IMAGE_SIZE, CLASSES, MODELDIR, INDICES_TRAIN, INDICES_TEST = dataloader.loadModelFromDir(modelDir, weightFiles[0])
 
 summary(model, (1, IMAGE_SIZE, IMAGE_SIZE), 1, device="cpu")
 
