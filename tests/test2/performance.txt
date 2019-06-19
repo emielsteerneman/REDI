@@ -1,0 +1,14 @@
+  Min: 0.15
+  Max: 0.78
+ Mean: 0.56
+  Var: 0.02
+
+Custom performance
+       airplane|  13   0   2   1   0   6
+      parachute|   0  11   0   0   0   0
+    screwdriver|   3   0  12   0   0   1
+            cat|   1   0   2  12   0   5
+          pizza|   0   4   0   4   6   4
+          zebra|   0   0   0   0   0   9
+    % : 0.66
+
