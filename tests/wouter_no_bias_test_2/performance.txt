@@ -1,0 +1,25 @@
+OG
+       airplane|  12   0   0   3   0   0
+      parachute|   0  15   1   0   1   0
+    screwdriver|   4   1  12   1   0   0
+            cat|   1   0   0  14   1   0
+          pizza|   0   1   0   0  14   0
+          zebra|   0   1   0   0   0  14
+    % : 0.84
+
+
+  Min: 0.52
+  Max: 0.90
+ Mean: 0.76
+  Var: 0.00
+[dataloader] Loading weights from model_190626-145018_6_80_1_2_8_64/99_0.82.model
+[Network] 1x64x64 -> 8x32x32|8x32x32 -> 8x16x16|Adaptive -> 8x4x4|dropout|1x128 -> 1x6
+
+Custom performance
+       airplane|  14   0   0   1   0   0
+      parachute|   1  15   0   0   1   0
+    screwdriver|  10   2   5   0   1   0
+            cat|   4   0   0  10   2   0
+          pizza|   1   0   0   0  14   0
+          zebra|   4   0   0   1   0  10
+    % : 0.71
