@@ -97,13 +97,13 @@ print("  Max: %0.2f" % np.max(percentages))
 print(" Mean: %0.2f" % np.mean(percentages))
 print("  Var: %0.2f" % np.var(percentages))
 
-def disable(model, feature, kernel=None):
-	if kernel == None:
-		model.convLayers[0][0].weight.data[feature].numpy().fill(0)
-	elif kernel == "all":
-		model.convLayers[1][0].weight[feature].data.numpy().fill(0)
+def disable(model, row, column=None):
+	if column == None:
+		model.convLayers[0][0].weight.data[row].numpy().fill(0)
+	elif row == "all":
+		model.convLayers[1][0].weight[column].data.numpy().fill(0)
 	else:
-		model.convLayers[1][0].weight[feature][kernel].data.numpy().fill(0)
+		model.convLayers[1][0].weight[column][row].data.numpy().fill(0)
 
 def disable_weights(model, c, kernel, subpixel=None):
 	if subpixel == None:
@@ -115,48 +115,11 @@ def disable_weights(model, c, kernel, subpixel=None):
 model, date, NCLASSES, NFILES, NBATCHES, NLAYERS, NCHANNELS, IMAGE_SIZE, CLASSES, MODELDIR, INDICES_TRAIN, INDICES_TEST = dataloader.loadLatestModel()
 model.eval()
 
-
-# disable_weights(model, 0, 2)
-# disable_weights(model, 1, 2)
-# disable_weights(model, 2, 2)
-# disable_weights(model, 3, 2)
-# disable_weights(model, 4, 2)
-# disable_weights(model, 5, 2)
-
-# disable_weights(model, 2, 0)
-# disable_weights(model, 2, 1)
-# disable_weights(model, 2, 2)
-# disable_weights(model, 2, 3)
-# disable_weights(model, 2, 4)
-# disable_weights(model, 2, 5)
-# disable_weights(model, 2, 6)
-# disable_weights(model, 2, 7)
-
-# disable(model, 2)
-# disable(model, 7)
-
-# disable_weights(6, 2)
-# disable_weights(7, 2)
-
-# disable(model, 2, 'all')
-# disable(model, 7, 'all')
-# disable(model, 0, 2)
-# disable(model, 1, 2)
-# disable(model, 2, 2)
-# disable(model, 3, 2)
-# disable(model, 4, 2)
-# disable(model, 5, 2)
-# disable(model, 6 ,2)
-# disable(model, 7, 2)	
-
-# disable(model, 3, 3)
-# disable(model, 4, 2)
-# disable(model, 4, 7)
-# disable(model, 5, 2)
-# disable(model, 5, 3)
-# disable(model, 6, 0)
-# disable(model, 6, 7)
-# disable(model, 7, 2)
+disable(model, 2)
+disable(model, "all", 4)
+disable(model, 1, 7)
+disable(model, 2, 7)
+disable(model, 3, 6)
 
 
 
