@@ -117,6 +117,6 @@ def renderKernels(model, MIN=None, MAX=None):
 			k = renderKernel(kernel)
 			k = 255 * (k - MIN) / (MAX - MIN)
 
-			x, y = 150 + iKernel*110, 20 + iKernels*110
+			x, y = 150 + iKernels*110, 20 + iKernel*110
 			img[y:y+90, x:x+90] = k
 	return img
