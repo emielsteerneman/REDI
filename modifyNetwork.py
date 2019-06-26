@@ -64,9 +64,9 @@ minP = 1
 for iEpoch in range(1):
 	model, date, NCLASSES, NFILES, NBATCHES, NLAYERS, NCHANNELS, IMAGE_SIZE, CLASSES, MODELDIR, INDICES_TRAIN, INDICES_TEST = dataloader.loadLatestModel()
 	model.eval()
-	indices = list(np.random.choice(NCHANNELS, NCHANNELS//FRACTION, replace=False))
+	indices = list(np.random.choice(NCHANNELS, 1, replace=False))
 	for i in indices:
-		# print("Disabling kernel %d in layer 1" % i)
+		print("Disabling kernel %d in layer 1" % i)
 		model.convLayers[0][0].weight.data[i].numpy().fill(0)
 		# model.convLayers[0][0].bias.data[i].numpy().fill(0)
 
