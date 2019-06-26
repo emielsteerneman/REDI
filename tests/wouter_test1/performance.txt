@@ -1,0 +1,17 @@
+og accuracy: Accuracy : 0.78
+
+  Min: 0.21
+  Max: 0.81
+ Mean: 0.50
+  Var: 0.02
+[dataloader] Loading weights from model_190626-101828_6_80_1_2_8_64/99_0.81.model
+[Network] 1x64x64 -> 8x32x32|8x32x32 -> 8x16x16|Adaptive -> 8x4x4|dropout|1x128 -> 1x6
+
+Custom performance
+       airplane|  14   0   0   0   2   0
+      parachute|   0  15   0   0   1   0
+    screwdriver|   9   1   0   3   2   0
+            cat|   1   1   0   5   8   0
+          pizza|   1   2   0   0  13   0
+          zebra|   5   1   0   6   2   4
+    % : 0.53
