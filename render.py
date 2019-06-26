@@ -105,11 +105,19 @@ def renderKernels(model, MIN=None, MAX=None):
 		MIN = min(np.min(conv1Kernels), np.min(conv2Kernels))
 		MAX = max(np.max(conv1Kernels), np.max(conv2Kernels))
 
-	img = np.ones((900, 1030), dtype=np.uint8) * 20
+	img = np.ones((950, 1030), dtype=np.uint8) * 20
+
+	c = int(-MIN * 256 / (MAX - MIN))
+	bw, bh = 500, 20
+	bx, by = (img.shape[1] - bw) // 2, 15
+	cv2.rectangle(img, (bx, by), (bx+bw, by+bh), (c, c, c), -1)
+	cv2.putText(img, "%0.3f" % MIN, (bx-100, by+18), cv2.FONT_HERSHEY_SIMPLEX, 0.8, (255, 255, 255), lineType=cv2.LINE_AA)
+	cv2.putText(img, "%0.3f" % MAX, (bx+bw+5, by+18), cv2.FONT_HERSHEY_SIMPLEX, 0.8, (255, 255, 255), lineType=cv2.LINE_AA)
+
 	for iKernel, kernel in enumerate(conv1Kernels):
 		k = renderKernel(kernel)
 		k = 255 * (k - MIN) / (MAX - MIN)
-		x, y = 20, 20 + iKernel*110
+		x, y = 20, 70 + iKernel*110
 		img[y:y+90, x:x+90] = k
 
 	for iKernels, kernels in enumerate(conv2Kernels):
@@ -117,6 +125,6 @@ def renderKernels(model, MIN=None, MAX=None):
 			k = renderKernel(kernel)
 			k = 255 * (k - MIN) / (MAX - MIN)
 
-			x, y = 150 + iKernels*110, 20 + iKernel*110
+			x, y = 150 + iKernels*110, 70 + iKernel*110
 			img[y:y+90, x:x+90] = k
 	return img
