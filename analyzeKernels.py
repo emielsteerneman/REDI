@@ -58,19 +58,19 @@ c = int(-MIN * 256 / (MAX - MIN))
 
 ### Write all renders+sidebar to video
 for iRender, render in enumerate(renders):
-	img = np.ones((RENDER_HEIGHT+50, RENDER_WIDTH, 3), dtype=np.uint8) * 20
+	img = np.ones((RENDER_HEIGHT, RENDER_WIDTH, 3), dtype=np.uint8) * 20
 	
 	# Add bar
-	bw = 500
-	bx = (RENDER_WIDTH - bw) // 2
-	by = 15
-	cv2.rectangle(img, (bx, by), (bx+bw, by+20), (c, c, c), -1)
-	cv2.putText(img, "%0.3f" % MIN, (bx-100, by+18), cv2.FONT_HERSHEY_SIMPLEX, 0.8, (255, 255, 255), lineType=cv2.LINE_AA)
-	cv2.putText(img, "%0.3f" % MAX, (bx+bw+5, by+18), cv2.FONT_HERSHEY_SIMPLEX, 0.8, (255, 255, 255), lineType=cv2.LINE_AA)
+	# bw = 500
+	# bx = (RENDER_WIDTH - bw) // 2
+	# by = 15
+	# cv2.rectangle(img, (bx, by), (bx+bw, by+20), (c, c, c), -1)
+	# cv2.putText(img, "%0.3f" % MIN, (bx-100, by+18), cv2.FONT_HERSHEY_SIMPLEX, 0.8, (255, 255, 255), lineType=cv2.LINE_AA)
+	# cv2.putText(img, "%0.3f" % MAX, (bx+bw+5, by+18), cv2.FONT_HERSHEY_SIMPLEX, 0.8, (255, 255, 255), lineType=cv2.LINE_AA)
 
-	img[50:, :, 0] = render
-	img[50:, :, 1] = render
-	img[50:, :, 2] = render
+	img[:, :, 0] = render
+	img[:, :, 1] = render
+	img[:, :, 2] = render
 
 	writer.write(img)
 	
