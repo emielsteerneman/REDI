@@ -4,10 +4,10 @@ import dataloader
 from torchsummary import summary
 import cv2
 import torch
-from render import renderKernels
+from render import renderKernels, render3dBarCharts
 
 # Numpy pretty print
-np.set_printoptions(precision=2)
+np.set_printoptions(precision=4)
 
 ### Load model
 # modelDir = None
@@ -59,32 +59,56 @@ testPerformance(model, data[INDICES_TEST], iClasses[INDICES_TEST])
 print("\nRANDOM")
 FRACTION = 4
 percentages = []
+todisable = ["fc"]
 maxP = 0
 minP = 1
-for iEpoch in range(1):
+for iEpoch in range(1000):
 	model, date, NCLASSES, NFILES, NBATCHES, NLAYERS, NCHANNELS, IMAGE_SIZE, CLASSES, MODELDIR, INDICES_TRAIN, INDICES_TEST = dataloader.loadLatestModel()
 	model.eval()
-	indices = list(np.random.choice(NCHANNELS, 1, replace=False))
-	for i in indices:
-		print("Disabling kernel %d in layer 1" % i)
-		model.convLayers[0][0].weight.data[i].numpy().fill(0)
-		# model.convLayers[0][0].bias.data[i].numpy().fill(0)
+	if "kernels" in todisable:
+		indices = list(np.random.choice(NCHANNELS, 1, replace=False))
+		for i in indices:
+			# print("Disabling kernel %d in layer 1" % i)
+			model.convLayers[0][0].weight.data[i].numpy().fill(0)
+			# model.convLayers[0][0].bias.data[i].numpy().fill(0)
 
-	indices = list(np.random.choice(NCHANNELS*NCHANNELS, (NCHANNELS*NCHANNELS) // FRACTION, replace=False))
-	for i in indices:
-		iFeature = i // NCHANNELS
-		iKernel = i % NCHANNELS
-		# print("Disabling kernel %d of feature %d in layer 2" % (iKernel, iFeature))
-		model.convLayers[1][0].weight[iFeature][iKernel].data.numpy().fill(0)
-		# model.convLayers[1][0].bias[iFeature].data.numpy().fill(0)
+		indices = list(np.random.choice(NCHANNELS*NCHANNELS, (NCHANNELS*NCHANNELS) // FRACTION, replace=False))
+		for i in indices:
+			iFeature = i // NCHANNELS
+			iKernel = i % NCHANNELS
+			# print("Disabling kernel %d of feature %d in layer 2" % (iKernel, iFeature))
+			model.convLayers[1][0].weight[iFeature][iKernel].data.numpy().fill(0)
+			# model.convLayers[1][0].bias[iFeature].data.numpy().fill(0)
+	
+	if "fc" in todisable:
+		indices = list(np.random.choice(128*NCLASSES, (128*NCLASSES) // (4*FRACTION), replace=False))
+		for i in indices:
+			c = i//128
+			w = i%128
+			model.fc.weight.data.numpy()[c][w] *= -1
+
+
 	p = testPerformance(model, data[INDICES_TEST], iClasses[INDICES_TEST])
+	
 	if maxP < p:
-		img = renderKernels(model)
-		cv2.imwrite(MODELDIR + "/modifiedMax.png", img)
+		if "kernels" in todisable:
+			img = renderKernels(model)
+			cv2.imwrite(MODELDIR + "/modifiedMax.png", img)
+		if "fc" in todisable:
+			weights = model.fc.weight.data.numpy()
+			weights = weights.reshape((NCLASSES, NCHANNELS, 4*4))
+			img = render3dBarCharts(weights, 10, 2, 200)
+			cv2.imwrite(MODELDIR + "/weightsMax.png", img)
 		maxP = p
 	if p < minP:
-		img = renderKernels(model)
-		cv2.imwrite(MODELDIR + "/modifiedMin.png", img)
+		if "kernels" in todisable:
+			img = renderKernels(model)
+			cv2.imwrite(MODELDIR + "/modifiedMin.png", img)
+		if "fc" in todisable:
+			weights = model.fc.weight.data.numpy()
+			weights = weights.reshape((NCLASSES, NCHANNELS, 4*4))
+			img = render3dBarCharts(weights, 10, 2, 200)
+			cv2.imwrite(MODELDIR + "/weightsMin.png", img)
 		minP = p
 
 	percentages.append(p)
@@ -94,8 +118,8 @@ for iEpoch in range(1):
 percentages = np.array(percentages)
 print("  Min: %0.2f" % np.min(percentages))
 print("  Max: %0.2f" % np.max(percentages))
-print(" Mean: %0.2f" % np.mean(percentages))
-print("  Var: %0.2f" % np.var(percentages))
+print(" Mean: %0.3f" % np.mean(percentages))
+print("  Var: %0.4f" % np.var(percentages))
 
 def disable(model, row, column=None):
 	if column == None:
@@ -105,21 +129,57 @@ def disable(model, row, column=None):
 	else:
 		model.convLayers[1][0].weight[column][row].data.numpy().fill(0)
 
-def disable_weights(model, c, kernel, subpixel=None):
-	if subpixel == None:
-		model.fc.weight.data.numpy()[c][kernel*16:(kernel+1)*16].fill(0)
+def flip_weights(model, c, kernel = None, subweight=None):
+	if kernel == None and subweight == None:
+		model.fc.weight.data.numpy()[c] *= -1.0
+	elif subweight == None:
+		model.fc.weight.data.numpy()[c][kernel*16:(kernel+1)*16] *= -1.0
+	elif kernel == None:
+		model.fc.weight.data.numpy()[c][subweight] *= -1.0
 	else:
-		model.fc.weight.data.numpy()[c][kernel*16+subpixel] = 0.0
+		model.fc.weight.data.numpy()[c][kernel*16+subweight] *= -1.0
 
 #### SPECIFIC ####
 model, date, NCLASSES, NFILES, NBATCHES, NLAYERS, NCHANNELS, IMAGE_SIZE, CLASSES, MODELDIR, INDICES_TRAIN, INDICES_TEST = dataloader.loadLatestModel()
 model.eval()
 
-disable(model, 2)
-disable(model, "all", 4)
-disable(model, 1, 7)
-disable(model, 2, 7)
-disable(model, 3, 6)
+
+
+
+# all = "all"
+
+# disable(model, 1)
+
+# disable(model, 3, 2)
+# disable(model, 5, 2)
+# disable(model, 0, 4)
+# disable(model, 0, 3)
+# disable(model, 5, 0)
+# disable(model, 3, 1)
+# disable(model, 3, 3)
+# disable(model, 5, 7)
+# disable(model, 7, 3)
+# disable(model, 1, 5)
+# disable(model, 1, 7)
+# disable(model, 2, 2)
+# disable(model, 2, 6)
+# disable(model, 6, 1)
+# disable(model, 6, 3)
+# disable(model, 4, 5)
+
+# disable(model, 2)
+# disable(model, "all", 4)
+# disable(model, 1, 7)
+# disable(model, 2, 7)
+# disable(model, 3, 6)
+
+# disable(model, all, 7)
+# disable_weights(model, 0, 7)
+# disable_weights(model, 1, 7)
+# disable_weights(model, 2, 7)
+# disable_weights(model, 3, 7)
+# disable_weights(model, 4, 7)
+# disable_weights(model, 5, 7)
 
 
 
