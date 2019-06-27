@@ -114,8 +114,8 @@ writer = cv2.VideoWriter(modelDir + "/fc_weights.mp4", cv2.VideoWriter_fourcc(*'
 ### Write all renders+sidebar to video
 for iRender, render in enumerate(renders):
 	img = np.concatenate((sidebar, render), axis=1)
-	if iRender == 0:
-		cv2.imwrite(modelDir +"/weights_before.png", img)
+	if iRender % 10 == 0:
+		cv2.imwrite(modelDir +"/weights_"+str(iRender)+".png", img)
 	writer.write(img)
 writer.release()
 
